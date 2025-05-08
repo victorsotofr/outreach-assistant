@@ -1,0 +1,20 @@
+first_name,last_name,email,company,role,education,location
+Neto,Leal,neto.leal@alphasights.com,AlphaSights,Senior Software Engineer,,São Paulo
+Kathy,Alexion,kathy.alexion@alphasights.com,AlphaSights,Strategic Advisor and Technology Consultant,"University of Washington, Michael G. Foster School of Business",United States
+Sascha,Schermer,sascha.schermer@alphasights.com,AlphaSights,Senior Vice President,Universität Witten/Herdecke,London
+Martin,Eder,martin.eder@alphasights.com,AlphaSights,"Advisor on Strategy, Technology and Innovation",,Vienna
+Sophie,Guignard,sophie.guignard@engie.com,ENGIE,Business Transformation ,HEC Paris,Paris
+David,Riviere,david.riviere@engie.com,ENGIE,Data democratization program lead,HEC Paris,Paris
+Paul,Narchi,paul.narchi@saint-gobain.com,Saint-Gobain,Head of Business Analytics,École Polytechnique,Paris
+Sarra,Jhinaoui,sarra.jhinaoui@saint-gobain.com,Saint-Gobain,Strategy Director ,HEC Paris,Paris
+Noémie,Chocat,noemie.chocat@saint-gobain.com,Saint-Gobain,VP Strategy ,École Polytechnique,Paris
+Nicolas,Moulinot,nicolas.moulinot@saint-gobain.com,Saint-Gobain,Data Governance Officer ,HEC Paris,Paris
+Alexandre,Gouin,alexandre.gouin@saint-gobain.com,Saint-Gobain,Digital transformation ,École Polytechnique,Paris
+Nicolas,Mion,nicolas.mion@saint-gobain.com,Saint-Gobain,Lead Data Scientist,HEC Paris,Paris
+Gabriel,JULIA,gabrieljulia@eurofins-biomnis.com,Eurofins,Group Senior VP,,Brussels
+Olivier,Argaut,olivierargaut@eurofins.com,Eurofins,General Manager in IT and Business Operations,École Polytechnique,Madrid
+Jean-Charles,Bodet,jean-charlesbodet@eurofins.com,Eurofins,Chief Digital & Automation Officer,ESCP Europe,Paris
+Luis Miguel,Gonçalves,luismiguelgoncalves@eurofins.com,Eurofins,Head of IT & Digital Transformation,Maryville University of Saint Louis,Ballwin
+Ruben,Bogaerts,rubenbogaerts@eurofins.com,Eurofins,Head of Software Asset Management & Finops ,Universiteit Hasselt,Brussels
+Marek,Cendrowicz,marek.cendrowicz@eurofins.ie,Eurofins,Regional IT Infrastructure Director Food & Feed and Environment Testing Europe ,,Brussels
+Tobias,Meiler,tobiasmeiler@eurofins.com,Eurofins,Group CIO,,Frankfurt 

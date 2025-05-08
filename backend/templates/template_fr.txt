@@ -1,0 +1,19 @@
+<p>Bonjour [CIVILITÉ] [LAST_NAME],</p>
+
+<p>
+Avec quelques camarades de l’École Polytechnique et de HEC Paris, nous travaillons depuis quelques mois à mieux comprendre comment les équipes comme la votre travaillent avec de l’analyse documentaire. Dans ce cadre, nous avons abouti sur le développement d'un outil permettant de transformer des documents complexes en donnée structurée.
+</p>
+
+<p>
+Compte tenu de votre expérience et de votre rôle au sein de [COMPANY], je serais très curieux d’avoir votre retour sur notre technologie. Auriez-vous 15 minutes cette semaine ou la prochaine pour un rapide échange ?
+</p>
+
+<p>Merci d’avance et au plaisir de vous lire,</p>
+
+<p>
+Victor Soto<br>
+victor.soto@polytechnique.edu<br>
+victor.soto@hec.edu<br>
++33 6 95 17 79 98<br>
+<a href="https://www.linkedin.com/in/victor-soto-203a961a2">LinkedIn</a>
+</p>

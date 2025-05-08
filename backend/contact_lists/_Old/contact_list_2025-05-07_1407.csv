@@ -1,0 +1,22 @@
+first_name,last_name,email,company,role,education,location
+Iris,Malone,iris@geoquant.com,,"Director, AI and Data Science",,Washington
+Mandeep,Shapley,mandeep.shapley@fitchsolutions.com,Fitch Solutions,"Data Operations Director, CDO ",,London
+Dan,Champeau,dan.champeau@fitchsolutions.com,Fitch Solutions,"Managing Director, Global Group Head - Ratings Data & Research",University of Maryland College Park,United States
+Brice,Dunlop,brice.dunlop@fitchsolutions.com,Fitch Solutions,"Associate Director, Head Of Consumer Research ",Stellenbosch University,London
+Nick,Craig,nick.craig@fitchsolutions.com,Fitch Solutions,Head of Data Products,Imperial College London,London
+Christopher,Heller,christopher.heller@fitchsolutions.com,Fitch Solutions,Director,University of Greenwich,Dubai
+David,Adams,david.adams@atheneum.ai,Atheneum,CTO,UCL,London
+Juntaek,Oh,juntaek.oh@atheneum.ai,Atheneum,"Director, Global Expert-Backed Research",Queen's University,Shanghai
+Graham,Wilson,graham.wilson@atheneum.ai,Atheneum,Data Science Manager,,Oxford
+Andy,Paxton,andy.paxton@jato.com,JATO Dynamics,Chief Information Officer,,Wigan
+Craig,Lowe,craig.lowe@jato.com,JATO Dynamics,Data Operations Lead ,Greenhill College,United Kingdom
+Michael,Kasuba,michael.kasuba@jato.com,JATO Dynamics,Global Head of Analytics,Michigan State University,Detroit
+Alexandre,Parente,alexandre.parente@jato.com,JATO Dynamics,Head of Global Analysis & Reporting ,Université Paris-Est Créteil (UPEC),Paris
+Gregory,Brysbaert,gregory.brysbaert@creditsafe.com,Creditsafe,IT Director,Ecole centrale de Lille,Lille
+Paul,Beard,paul.beard@creditsafe.com,Creditsafe,Managing Director - International,"University of Wales, Swansea",Greater Cardiff Area
+Patrick,Remmler,patrick.remmler@creditsafe.com,Creditsafe,Senior Product Director,Freie Universität Berlin,Berlin
+Navdeep,Sharma,navdeep.sharma@creditsafe.com,Creditsafe,Director ,"National University of Ireland, Galway",Dublin
+Ryland,Marsh,ryland.marsh@creditsafe.com,Creditsafe,Director of Engineering,University Of Manchester,Cardiff
+Rodolphe,Dhenin,rodolphe.dhenin@creditsafe.fr,Creditsafe,IT & Product Director,,Lille
+Christian,Meister,christian.meister@creditsafe.com,Creditsafe,Director Data & Product ,Universität Leipzig,Germany
+Brian,McGeough,brian.mcgeough@creditsafe.com,Creditsafe,Chief Information Officer,"National University of Ireland, Maynooth",Ireland

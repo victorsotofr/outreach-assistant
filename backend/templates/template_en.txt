@@ -1,0 +1,23 @@
+<p>Hi [CIVILITY] [LAST_NAME],</p>
+
+<p>
+With a few peers from École Polytechnique and HEC Paris, we've been working for a few months to better understand how teams like yours manage document analysis. Along the way, we've come up with a tool to turn complex files into structured data.
+</p>
+
+<p>
+Given your experience at [COMPANY], your insights would be incredibly valuable. Would you have 15 minutes next week for a quick chat?
+</p>
+
+<p>
+Thanks a lot, and looking forward to talking if you’re up for it!
+</p>
+
+<p>Best regards,</p>
+
+<p>
+Victor Soto<br>
+victor.soto@polytechnique.edu<br>
+victor.soto@hec.edu<br>
++33 6 95 17 79 98<br>
+<a href="https://www.linkedin.com/in/victor-soto-203a961a2">LinkedIn</a>
+</p>
