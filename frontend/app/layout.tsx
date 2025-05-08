@@ -15,9 +15,9 @@ const geistMono = Roboto_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Finance Interviewer – AI Practice Platform",
+  title: "UiForm – Outreach Assistant",
   description:
-    "Master your finance interviews with AI-powered mock sessions, feedback, and personalized prep tools.",
+    "Take Your Outreach Further with UiForm",
 };
 
 export default function RootLayout({
@@ -31,7 +31,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-white text-gray-900`}
       >
         <ClientLayout>{children}</ClientLayout>
-        <Toaster richColors /> {/* ✅ Toast system mounted here */}
+        <Toaster richColors /> {/* Toast system mounted here */}
       </body>
     </html>
   );

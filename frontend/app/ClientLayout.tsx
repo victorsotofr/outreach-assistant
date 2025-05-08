@@ -49,7 +49,16 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
         )}
       >
         <div className="space-y-6">
-          <div className="flex justify-end">
+          <div className="flex items-center justify-between">
+            {!collapsed && (
+              <div className="pl-2">
+                <img
+                  src="/uiform-logo.png"
+                  alt="UiForm Logo"
+                  className="h-8 w-auto"
+                />
+              </div>
+            )}
             <button
               onClick={() => setCollapsed(!collapsed)}
               className="text-gray-400 hover:text-gray-700 transition text-sm"
@@ -62,12 +71,10 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
             <>
               <div>
                 <p className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">
-                  MODE
+                  ASSISTANT
                 </p>
                 <nav className="space-y-1 pl-2">
-                  {navLink("/chat", "Chat")}
-                  {navLink("/mcq", "MCQ")}
-                  {navLink("/free-answer", "Free-Answer")}
+                  {navLink("/dashboard", "⌟ Dashboard")}
                 </nav>
               </div>
 
@@ -76,8 +83,7 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
                   USEFUL
                 </p>
                 <nav className="space-y-1 pl-2">
-                  {navLink("/dashboard", "⌟ Dashboard")}
-                  {navLink("/references", "References")}
+                  {navLink("/demo", "⌟ Demo")}
                   {navLink("/settings", "Settings")}
                 </nav>
               </div>
@@ -95,7 +101,7 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
                 ⇤ Sign Out
               </button>
               <div className="text-xs text-gray-400 text-center">
-                Built with 🖤 for Finance Students
+                Built with 🖤 for UiForm.com
               </div>
             </>
           )}

@@ -9,11 +9,11 @@ const handler = NextAuth({
     }),
   ],
   pages: {
-    signIn: "/", // custom sign-in page (landing page)
+    signIn: "/",
   },
   callbacks: {
     async redirect({ url, baseUrl }) {
-      return `${baseUrl}/chat`; // Always redirect to /chat after login
+      return `${baseUrl}/dashboard`;
     },
     async session({ session }) {
       return session;

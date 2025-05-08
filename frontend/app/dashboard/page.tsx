@@ -64,17 +64,6 @@ export default function DashboardPage() {
               </ul>
             </CardContent>
           </Card>
-
-          {/* Recommendation */}
-          <Card>
-            <CardContent className="p-6 space-y-4">
-              <h2 className="text-lg font-semibold">Next Suggested Topic</h2>
-              <p className="text-sm text-gray-600">
-                We recommend practicing: <span className="font-semibold text-[#1C65BD]">Corporate Finance – DCF Fundamentals</span>
-              </p>
-              <Button onClick={() => router.push("/mcq")}>Start Quiz</Button>
-            </CardContent>
-          </Card>
         </div>
       </div>
     </main>

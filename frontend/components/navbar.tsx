@@ -17,7 +17,7 @@ export function Navbar() {
           <div className="flex items-center">
             <Button
               variant="ghost"
-              onClick={() => signIn("google", { callbackUrl: "/chat" })}
+              onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
               className="text-gray-900 hover:text-gray-600 font-semibold text-base sm:text-lg transition-colors"
             >
               ⇥ Sign In
