@@ -84,6 +84,7 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
                 </p>
                 <nav className="space-y-1 pl-2">
                   {navLink("/demo", "⌟ Demo")}
+                  {navLink("/templates", "⌟ Templates")}
                   {navLink("/settings", "Settings")}
                 </nav>
               </div>

@@ -22,6 +22,7 @@ export default function DashboardPage() {
       <div className="flex-1 overflow-y-auto px-6 py-8 flex justify-center">
         <div className="w-full max-w-4xl space-y-6">
           <h1 className="text-2xl font-semibold">⌟ Demo</h1>
+              <h2 className="text-lg font-semibold">Coming Soon...</h2>        
         </div>
       </div>
     </main>
