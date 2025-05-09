@@ -2,6 +2,9 @@
 pandas
 python-dotenv
 requests
+fastapi
+uvicorn
+pymongo
 
 # Email
 smtplib

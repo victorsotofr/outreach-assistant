@@ -3,8 +3,81 @@ import sys
 import multiprocessing
 import subprocess
 from scripts import send_emails
+from fastapi import FastAPI, Request, UploadFile, File, Form
+from fastapi.middleware.cors import CORSMiddleware
+from db.config_db import save_user_config, get_user_config, get_user_templates, save_template, delete_template, update_template
 
 # === Setup ===
+app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+@app.post("/config")
+async def post_config(request: Request):
+    data = await request.json()
+    email = data.get("email")
+    config = data.get("config")
+    if not email or not config:
+        return {"error": "Missing email or config"}
+    save_user_config(email, config)
+    return {"status": "ok"}
+
+@app.get("/config")
+async def fetch_config(email: str):
+    return get_user_config(email)
+
+# Template endpoints
+@app.get("/templates")
+async def fetch_templates(email: str):
+    return get_user_templates(email)
+
+@app.post("/templates")
+async def create_template(request: Request):
+    data = await request.json()
+    email = data.get("email")
+    template = data.get("template")
+    if not email or not template:
+        return {"error": "Missing email or template"}
+    return save_template(email, template)
+
+@app.post("/templates/upload")
+async def upload_template(email: str = Form(...), file: UploadFile = File(...)):
+    if not file.filename.endswith('.txt'):
+        return {"error": "Only .txt files are allowed"}
+    
+    content = await file.read()
+    try:
+        template = {
+            "name": file.filename.replace(".txt", ""),
+            "content": content.decode('utf-8')
+        }
+        return save_template(email, template)
+    except UnicodeDecodeError:
+        return {"error": "Invalid text file encoding. Please use UTF-8."}
+
+@app.delete("/templates/{template_name}")
+async def remove_template(email: str, template_name: str):
+    success = delete_template(email, template_name)
+    return {"success": success}
+
+@app.put("/templates/{template_name}")
+async def update_template_endpoint(template_name: str, request: Request):
+    data = await request.json()
+    email = data.get("email")
+    updated_template = data.get("template")
+    if not email or not updated_template:
+        return {"error": "Missing email or template"}
+    result = update_template(email, template_name, updated_template)
+    if result:
+        return result
+    return {"error": "Template not found or could not be updated"}
+
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 SCRIPTS_DIR = os.path.join(PROJECT_DIR, "scripts")
 

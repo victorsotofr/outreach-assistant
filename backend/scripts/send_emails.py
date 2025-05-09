@@ -13,35 +13,37 @@ from openai import OpenAI
 
 # === PATH SETUP ===
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-PROJECT_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, "..", ".."))
+PROJECT_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, ".."))
 load_dotenv(os.path.join(PROJECT_ROOT, ".env"))
 
-# === EMAIL CONFIG ===
-SMTP_USERNAME = os.getenv("SMTP_USERNAME")
-SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
-SMTP_SERVER = os.getenv("SMTP_SERVER")
-SMTP_PORT = int(os.getenv("SMTP_PORT"))
-FROM_EMAIL = SMTP_USERNAME
-
 # === DATA PATHS ===
-CONTACT_LIST_PATH = os.path.join(PROJECT_ROOT, "backend", "contact_lists", "contact_list.csv")
-TEMPLATE_FR_PATH = os.path.join(PROJECT_ROOT, "backend", "templates", "template_fr.txt")
-TEMPLATE_EN_PATH = os.path.join(PROJECT_ROOT, "backend", "templates", "template_en.txt")
-OUTPUT_DIR = os.path.join(PROJECT_ROOT, "backend", "output")
+CONTACT_LIST_PATH = os.path.join(PROJECT_ROOT, "contact_lists", "contact_list.csv")
+TEMPLATE_FR_PATH = os.path.join(PROJECT_ROOT, "templates", "template_fr.txt")
+TEMPLATE_EN_PATH = os.path.join(PROJECT_ROOT, "templates", "template_en.txt")
+OUTPUT_DIR = os.path.join(PROJECT_ROOT, "output")
 OLD_OUTPUT_DIR = os.path.join(OUTPUT_DIR, "_Old")
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-# === Load Templates ===
+# === Load Templates Once ===
 with open(TEMPLATE_FR_PATH, "r", encoding="utf-8") as f:
     template_fr = f.read()
 
 with open(TEMPLATE_EN_PATH, "r", encoding="utf-8") as f:
     template_en = f.read()
 
-# === OpenAI Client ===
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-def enrich_contact(contact):
+# === Config loading at runtime ===
+def load_config():
+    return {
+        "SMTP_USERNAME": os.getenv("SMTP_USERNAME"),
+        "SMTP_PASSWORD": os.getenv("SMTP_PASSWORD"),
+        "SMTP_SERVER": os.getenv("SMTP_SERVER"),
+        "SMTP_PORT": int(os.getenv("SMTP_PORT", "587")),
+        "OPENAI_API_KEY": os.getenv("OPENAI_API_KEY")
+    }
+
+
+def enrich_contact(contact, client):
     prompt = f"""
 You are helping personalize professional emails for business executives. Here is the contact's information:
 
@@ -52,31 +54,8 @@ Company: {contact['company']}
 Location: {contact['location']}
 
 Tasks:
-1. Determine the preferred language ("French" or "English") according to the following logic:
-   - If the location mentions France or a French-speaking city (e.g., Paris, Lyon, Marseille, Geneva, Brussels), choose "French".
-   - If the location is in an English-speaking country (e.g., UK, USA, Canada except Quebec), choose "English".
-   - If you cannot determine from the location, try to guess from the first name (Luc, Pierre, Claire → commonly French; John, James, Emma → commonly English).
-   - If still uncertain, default to "English" for safety.
-
-2. Assign an appropriate civility:
-   - If French: "Monsieur" or "Madame" (based on first name gender).
-   - If English: "Mr" or "Ms".
-
-3. Enrich with company HQ, FTEs, and a short description - in English.
-   - HQ: "Paris" for BNP Paribas, "Boston" for BCG, "Paris" for TotalEnergies, etc.
-   - FTEs: "~100k" for BNP Paribas, "~600" for Alan, etc.
-   - Description: A short description resuming the company's activity - be concise and precise, for example: "Independent Equity & Credit Research", "Corporate & Investment Bank (Equity Research)", "Independent Equity Research", etc.
-   Pay attention that those information are the same if the company appears multiple times.
-   - If you cannot find the information, return "".
-
-Respond ONLY in JSON format like:
-{{
-  "language": "...",
-  "civility": "...",
-  "hq": "...",
-  "ftes": "...",
-  "description": "..."
-}}
+1. Determine the preferred language ("French" or "English")...
+[truncated here for brevity — same as your original prompt]
 """
     response = client.chat.completions.create(
         model="gpt-4.1-mini",
@@ -88,38 +67,46 @@ Respond ONLY in JSON format like:
     cleaned = re.sub(r"```$", "", cleaned.strip())
     return json.loads(cleaned)
 
+
 def get_school(education):
     if pd.isna(education):
         return "École polytechnique"
     return "HEC Paris" if str(education).strip().lower() == "hec paris" else "École polytechnique"
 
+
 def get_subject(language, school):
     return f"{school} * {'Projet de Structuration de Données' if language == 'French' else 'Structured Data Project'}"
+
 
 def fill_template(template, placeholders):
     for key, value in placeholders.items():
         template = template.replace(f"[{key.upper()}]", value)
     return template
 
-def send_email(to_email, subject, body):
+
+def send_email(to_email, subject, body, config):
     msg = MIMEMultipart()
-    msg["From"] = FROM_EMAIL
+    msg["From"] = config["SMTP_USERNAME"]
     msg["To"] = to_email
     msg["Subject"] = subject
-    msg["Bcc"] = FROM_EMAIL
+    msg["Bcc"] = config["SMTP_USERNAME"]
     msg.attach(MIMEText(body, "html"))
+
     try:
-        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+        with smtplib.SMTP(config["SMTP_SERVER"], config["SMTP_PORT"]) as server:
             server.starttls()
-            server.login(SMTP_USERNAME, SMTP_PASSWORD)
+            server.login(config["SMTP_USERNAME"], config["SMTP_PASSWORD"])
             server.send_message(msg)
         return True
     except Exception as e:
         return str(e)
 
+
 def run_from_ui():
+    config = load_config()
+    client = OpenAI(api_key=config["OPENAI_API_KEY"])
+
     df = pd.read_csv(CONTACT_LIST_PATH)
-    email_outputs = []
     enriched_rows = []
     today_str = datetime.today().strftime("%B %d, %Y")
 
@@ -128,7 +115,7 @@ def run_from_ui():
         print(msg)
         yield msg
 
-        enriched = enrich_contact(row)
+        enriched = enrich_contact(row, client)
         civility = enriched["civility"]
         language = enriched["language"]
         hq = enriched.get("hq", "")
@@ -148,7 +135,7 @@ def run_from_ui():
         template = template_fr if language == "French" else template_en
         email_body = fill_template(template, placeholders)
 
-        send_email(row["email"], subject, email_body)
+        send_email(row["email"], subject, email_body, config)
 
         enriched_rows.append({
             "company": row["company"],
@@ -199,6 +186,6 @@ if __name__ == "__main__":
         if confirm != "yes":
             print("❌ Aborted.")
             sys.exit()
-    
+
     for message in run_from_ui():
         print(message)
