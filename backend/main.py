@@ -3,7 +3,7 @@ import sys
 import multiprocessing
 import subprocess
 from scripts import send_emails
-from fastapi import FastAPI, Request, UploadFile, File, Form
+from fastapi import FastAPI, Request, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from db.config_db import save_user_config, get_user_config, get_user_templates, save_template, delete_template, update_template
 
@@ -98,9 +98,10 @@ def run_script(script_path):
     )
     return result.stdout + "\n" + result.stderr
 
-def run_script_background(script_path):
-    """Run a script in the background."""
-    os.system(f"{sys.executable} {script_path}")
+def run_script_background(script_path, *args):
+    """Run a script in the background with arguments."""
+    cmd = [sys.executable, script_path] + list(args)
+    os.system(" ".join(cmd))
 
 def start_watcher():
     """Start the folder watcher process."""
@@ -131,4 +132,105 @@ def get_folder_paths():
         "logs": logs_folder,
         "output": output_folder,
         "contact_list": contact_list_folder
-    } 
+    }
+
+# Track active watcher process
+active_watcher = None
+
+@app.post("/watcher/start")
+async def start_watcher(request: Request):
+    """Start watching the selected folder."""
+    global active_watcher
+    
+    # Check if watcher is already running
+    if active_watcher and active_watcher.is_alive():
+        return {"status": "already running"}
+    
+    data = await request.json()
+    watch_folder = data.get("watchFolder", "/Users/victorsoto/Downloads")
+    email = data.get("email")
+    
+    if not email:
+        raise HTTPException(status_code=400, detail="Email is required")
+    
+    print(f"Starting watcher for folder: {watch_folder}")
+    
+    active_watcher = multiprocessing.Process(
+        target=run_script_background,
+        args=(watch_script, watch_folder, email),
+        name="watcher"
+    )
+    active_watcher.start()
+    return {"status": "ok"}
+
+@app.post("/watcher/stop")
+async def stop_watcher():
+    """Stop the folder watcher."""
+    global active_watcher
+    try:
+        if active_watcher and active_watcher.is_alive():
+            active_watcher.terminate()
+            active_watcher = None
+            return {"status": "ok"}
+        return {"status": "not running"}
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.get("/")
+async def root():
+    return {"message": "API is running"}
+
+@app.post("/select-folder")
+async def select_folder():
+    """Open a folder selection dialog and return the selected path."""
+    print("Select folder endpoint called")  # Debug log
+    try:
+        # Simpler AppleScript to open folder picker
+        script = 'choose folder with prompt "Select a folder to watch for screenshots"'
+        print("Executing AppleScript...")
+        result = subprocess.run(['osascript', '-e', script], capture_output=True, text=True)
+        print(f"AppleScript result: {result.stdout}")
+        print(f"AppleScript error: {result.stderr}")
+        
+        if result.returncode == 0 and result.stdout.strip():
+            # Convert Mac path to POSIX path
+            posix_script = f'return POSIX path of "{result.stdout.strip()}"'
+            posix_result = subprocess.run(['osascript', '-e', posix_script], capture_output=True, text=True)
+            selected_path = posix_result.stdout.strip()
+            print(f"Selected path: {selected_path}")
+            return {"folder": selected_path}
+        else:
+            error_msg = result.stderr or "No folder selected"
+            print(f"Error selecting folder: {error_msg}")
+            return {"error": error_msg}
+    except Exception as e:
+        print(f"Exception in select_folder: {str(e)}")
+        return {"error": str(e)}
+
+@app.post("/download-contacts")
+async def download_contacts(request: Request):
+    try:
+        data = await request.json()
+        email = data.get("email")
+        sheet_url = data.get("sheet_url")
+
+        if not email or not sheet_url:
+            raise HTTPException(status_code=400, detail="Email and sheet URL are required")
+
+        # Call the download script
+        from scripts.download_contacts import download_and_clean_sheet
+        download_and_clean_sheet(sheet_url, confirm=False)
+        
+        return {"message": "Contacts downloaded successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/sheet-preview")
+async def get_sheet_preview(url: str):
+    """Get a preview of the first 5 rows from the Google Sheet."""
+    try:
+        from scripts.download_contacts import get_sheet_data
+        data = get_sheet_data(url, max_rows=5)
+        return data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) 
