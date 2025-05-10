@@ -6,6 +6,7 @@ from scripts import send_emails
 from fastapi import FastAPI, Request, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from db.config_db import save_user_config, get_user_config, get_user_templates, save_template, delete_template, update_template
+from fastapi.responses import StreamingResponse
 
 # === Setup ===
 app = FastAPI()
@@ -230,5 +231,28 @@ async def get_sheet_preview(url: str):
         from scripts.download_contacts import get_sheet_preview
         data = get_sheet_preview(url, rows=5)
         return data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/send-emails")
+async def send_emails(request: Request):
+    """Send outreach emails and return status updates."""
+    try:
+        data = await request.json()
+        email = data.get("email")
+        sheet_url = data.get("sheet_url")
+        confirmed = data.get("confirmed", False)
+        preview_only = data.get("preview_only", False)
+
+        if not email or not sheet_url:
+            raise HTTPException(status_code=400, detail="Email and sheet URL are required")
+
+        from scripts.send_emails import run_from_ui
+        
+        async def generate():
+            for message in run_from_ui(sheet_url, preview_only=preview_only):
+                yield message + "\n"
+
+        return StreamingResponse(generate(), media_type="text/event-stream")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) 
