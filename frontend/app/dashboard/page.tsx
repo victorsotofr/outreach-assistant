@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { FolderOpen } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+import { EyeIcon, EyeSlashIcon, ArrowDownTrayIcon, PaperAirplaneIcon } from "@heroicons/react/24/outline";
 
 interface Session {
   user?: {
@@ -38,6 +39,12 @@ export default function DashboardPage() {
   const [settings, setSettings] = useState<UserSettings>({});
   const [contactPreview, setContactPreview] = useState<any[]>([]);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+  const [config, setConfig] = useState<any>(null);
+  const [previewData, setPreviewData] = useState<any[]>([]);
+  const [showPreviewDialog, setShowPreviewDialog] = useState(false);
+  const [emailStatus, setEmailStatus] = useState<string[]>([]);
+  const [contactsProcessed, setContactsProcessed] = useState(0);
+  const [emailsSent, setEmailsSent] = useState(0);
 
   const toggleWatcher = async (checked: boolean) => {
     const endpoint = checked ? "/watcher/start" : "/watcher/stop";
@@ -165,28 +172,135 @@ export default function DashboardPage() {
   };
 
   const handleSendEmails = async () => {
-    setIsSending(true);
+    if (!config?.google_sheet_url) {
+      toast.error("Please set up your Google Sheet URL in the settings first");
+      return;
+    }
+
     try {
-      const response = await fetch('http://localhost:8000/send-emails', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json'
+      setIsSending(true);
+      setEmailStatus([]); // Clear previous status
+
+      const response = await fetch("http://localhost:8000/send-emails", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          email: session?.user?.email
-        })
+          email: session?.user?.email,
+          sheet_url: config.google_sheet_url,
+          preview_only: true // Add this flag to indicate we only want the preview
+        }),
       });
 
       if (!response.ok) {
-        const error = await response.text();
-        throw new Error(error);
+        const errorData = await response.json();
+        throw new Error(errorData.detail || "Failed to get preview");
       }
 
-      const data = await response.json();
-      toast.success('Emails sent successfully');
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error("No response stream available");
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const text = new TextDecoder().decode(value);
+        const messages = text.split('\n').filter(Boolean);
+
+        for (const message of messages) {
+          try {
+            const data = JSON.parse(message);
+            if (data.type === 'preview') {
+              setPreviewData(data.data);
+              setShowPreviewDialog(true);
+              return; // Wait for user confirmation
+            } else if (data.type === 'status') {
+              setEmailStatus(prev => [...prev, data.message]);
+              // Count successful email sends
+              if (data.message.includes("✓ Email sent to")) {
+                setEmailsSent(prev => prev + 1);
+              }
+            } else if (data.type === 'error') {
+              throw new Error(data.message);
+            }
+          } catch (e) {
+            console.error('Error parsing message:', e);
+          }
+        }
+      }
     } catch (error) {
-      console.error('Send emails error:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to send emails');
+      console.error("Error getting preview:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to get preview");
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const handleConfirmSend = async () => {
+    setShowPreviewDialog(false);
+    try {
+      setIsSending(true);
+      const response = await fetch("http://localhost:8000/send-emails", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: session?.user?.email,
+          sheet_url: config?.google_sheet_url,
+          confirmed: true
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorMessage;
+        try {
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData.detail || "Failed to send emails";
+        } catch {
+          errorMessage = errorText || "Failed to send emails";
+        }
+        throw new Error(errorMessage);
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error("No response stream available");
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const text = new TextDecoder().decode(value);
+        const messages = text.split('\n').filter(Boolean);
+
+        for (const message of messages) {
+          if (!message.trim()) continue;
+          
+          try {
+            const data = JSON.parse(message);
+            if (data.type === 'status') {
+              setEmailStatus(prev => [...prev, data.message]);
+              // Count successful email sends
+              if (data.message.includes("✓ Email sent to")) {
+                setEmailsSent(prev => prev + 1);
+              }
+            } else if (data.type === 'error') {
+              throw new Error(data.message);
+            }
+          } catch (e) {
+            console.error('Error parsing message:', e, 'Raw message:', message);
+            // If it's not JSON, treat it as a status message
+            setEmailStatus(prev => [...prev, message]);
+          }
+        }
+      }
+
+      toast.success("Emails sent successfully");
+    } catch (error) {
+      console.error("Error sending emails:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to send emails");
     } finally {
       setIsSending(false);
     }
@@ -195,6 +309,25 @@ export default function DashboardPage() {
   useEffect(() => {
     if (status === "unauthenticated") router.push("/");
   }, [status, router]);
+
+  // Fetch user config when component loads
+  useEffect(() => {
+    const fetchConfig = async () => {
+      if (session?.user?.email) {
+        try {
+          const response = await fetch(`http://localhost:8000/config?email=${session.user.email}`);
+          if (response.ok) {
+            const data = await response.json();
+            setConfig(data);
+          }
+        } catch (error) {
+          console.error("Error fetching config:", error);
+        }
+      }
+    };
+
+    fetchConfig();
+  }, [session?.user?.email]);
 
   if (status === "loading") return <div>Loading...</div>;
   if (!session) return null;
@@ -206,27 +339,42 @@ export default function DashboardPage() {
           <h1 className="text-2xl font-semibold">⌟ Dashboard</h1>
 
           <Card>
-            <CardContent className="p-6 space-y-4">
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm text-gray-700">
-                <div>
-                  <h2 className="block text-l font-light text-black">
-                    Bucket Folder Watcher
-                  </h2>
-                  <span className="block text-xl font-bold text-[#1C65BD]">
-                    {isWatching ? "Active" : "Inactive"}
+            <CardContent className="p-6">
+              <div className="grid grid-cols-3 gap-8">
+                <div className="flex flex-col items-center">
+                  <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-3 ${
+                    isWatching ? 'bg-green-100' : 'bg-gray-100'
+                  }`}>
+                    <div className={`w-8 h-8 rounded-full ${
+                      isWatching ? 'bg-green-500 animate-pulse' : 'bg-gray-400'
+                    }`} />
+                  </div>
+                  <span className="text-sm text-gray-600">Status</span>
+                  <span className={`text-lg font-semibold ${
+                    isWatching ? 'text-green-600' : 'text-gray-600'
+                  }`}>
+                    {isWatching ? 'Active' : 'Inactive'}
                   </span>
                 </div>
-                <div>
-                  <h2 className="block text-l font-light text-black">
-                    Contacts Processed
-                  </h2>
-                  <span className="block text-xl font-bold text-[#1C65BD]">0</span>
+
+                <div className="flex flex-col items-center">
+                  <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center mb-3">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                  </div>
+                  <span className="text-sm text-gray-600">Contacts</span>
+                  <span className="text-lg font-semibold text-blue-600">{contactsProcessed}</span>
                 </div>
-                <div>
-                  <h2 className="block text-l font-light text-black">
-                    Emails Sent
-                  </h2>
-                  <span className="block text-xl font-bold text-[#1C65BD]">0</span>
+
+                <div className="flex flex-col items-center">
+                  <div className="w-16 h-16 rounded-full bg-purple-100 flex items-center justify-center mb-3">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <span className="text-sm text-gray-600">Emails</span>
+                  <span className="text-lg font-semibold text-purple-600">{emailsSent}</span>
                 </div>
               </div>
             </CardContent>
@@ -236,7 +384,7 @@ export default function DashboardPage() {
             <CardContent className="p-6 space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-lg font-semibold">1. PNG File Watcher</h2>
+                  <h2 className="text-lg font-semibold">Bucker Folder</h2>
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="text-sm text-gray-600">Automatically process PNG files from your selected folder:</span>
@@ -245,7 +393,6 @@ export default function DashboardPage() {
                     <Switch
                       checked={isWatching}
                       onCheckedChange={toggleWatcher}
-                      disabled={isWatching && !watcherSessionId}
                     />
                     <span className="text-sm text-gray-500">On</span>
                   </div>
@@ -268,6 +415,7 @@ export default function DashboardPage() {
                   Select
                 </Button>
               </div>
+
               {isWatching && (
                 <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
                   <div className="flex items-start gap-2">
@@ -316,93 +464,119 @@ export default function DashboardPage() {
           </Card>
 
           <Card>
-            <CardContent className="p-6 space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-lg font-semibold">2. Download Contact List</h2>
-                  <p className="text-sm text-gray-600 mt-1">
-                    Get the latest contact list from your Google Sheet
-                  </p>
-                </div>
-                <Button 
+            <CardContent className="p-6">
+              <div className="grid grid-cols-3 gap-4">
+                <button
+                  onClick={() => toggleWatcher(!isWatching)}
+                  disabled={isWatching && !watcherSessionId}
+                  className={`flex flex-col items-center justify-center p-6 rounded-xl transition-all duration-200 ${
+                    isWatching
+                      ? 'bg-green-50 border-2 border-green-500'
+                      : 'bg-white border-2 border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  {isWatching ? (
+                    <EyeIcon className="h-12 w-12 mb-2 text-green-600" />
+                  ) : (
+                    <EyeSlashIcon className="h-12 w-12 mb-2 text-gray-600" />
+                  )}
+                  <span className={`text-lg font-medium ${isWatching ? 'text-green-600' : 'text-gray-900'}`}>
+                    Watch
+                  </span>
+                </button>
+
+                <button
                   onClick={handleDownload}
                   disabled={isDownloading}
-                  variant="outline"
-                  className="border-2 hover:bg-gray-50"
+                  className={`flex flex-col items-center justify-center p-6 rounded-xl transition-all duration-200 ${
+                    isDownloading
+                      ? 'bg-blue-50 border-2 border-blue-500'
+                      : 'bg-white border-2 border-gray-200 hover:border-gray-300'
+                  }`}
                 >
-                  {isDownloading ? "Downloading..." : "Download List ↓"}
-                </Button>
-              </div>
-              {settings.googleSheetUrl && (
-                <div className="mt-4 border rounded-lg overflow-hidden">
-                  <div className="bg-gray-50 px-4 py-2 border-b flex justify-between items-center">
-                    <h3 className="text-sm font-medium text-gray-700">Contact List Preview (First 5 rows)</h3>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {}}
-                      disabled={isLoadingPreview}
-                    >
-                      {isLoadingPreview ? "Refreshing..." : "Refresh"}
-                    </Button>
-                  </div>
-                  {isLoadingPreview ? (
-                    <div className="p-4 text-center text-gray-500">Loading preview...</div>
-                  ) : contactPreview.length > 0 ? (
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            {Object.keys(contactPreview[0]).map((header) => (
-                              <th key={header} className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                {header}
-                              </th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                          {contactPreview.map((row, idx) => (
-                            <tr key={idx}>
-                              {Object.values(row).map((value: any, cellIdx) => (
-                                <td key={cellIdx} className="px-4 py-2 text-sm text-gray-900 whitespace-nowrap">
-                                  {value}
-                                </td>
-                              ))}
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  ) : (
-                    <div className="p-4 text-center text-gray-500">No contacts available</div>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                  <ArrowDownTrayIcon className={`h-12 w-12 mb-2 ${isDownloading ? 'text-blue-600' : 'text-gray-600'}`} />
+                  <span className={`text-lg font-medium ${isDownloading ? 'text-blue-600' : 'text-gray-900'}`}>
+                    Download
+                  </span>
+                </button>
 
-          <Card>
-            <CardContent className="p-6 space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-lg font-semibold">3. Send Outreach Emails</h2>
-                  <p className="text-sm text-gray-600 mt-1">
-                    Send personalized emails to your contacts
-                  </p>
-                </div>
-                <Button 
+                <button
                   onClick={handleSendEmails}
                   disabled={isSending}
-                  variant="outline"
-                  className="border-2 hover:bg-gray-50"
+                  className={`flex flex-col items-center justify-center p-6 rounded-xl transition-all duration-200 ${
+                    isSending
+                      ? 'bg-purple-50 border-2 border-purple-500'
+                      : 'bg-white border-2 border-gray-200 hover:border-gray-300'
+                  }`}
                 >
-                  {isSending ? "Sending..." : "Send Emails ➢"}
-                </Button>
+                  <PaperAirplaneIcon className={`h-12 w-12 mb-2 ${isSending ? 'text-purple-600' : 'text-gray-600'}`} />
+                  <span className={`text-lg font-medium ${isSending ? 'text-purple-600' : 'text-gray-900'}`}>
+                    Send
+                  </span>
+                </button>
               </div>
             </CardContent>
           </Card>
         </div>
       </div>
+
+      {/* Preview Dialog */}
+      {showPreviewDialog && (
+        <div className="fixed inset-0 backdrop-blur-sm bg-white/30 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg p-6 max-w-4xl w-full shadow-xl">
+            <h3 className="text-lg font-semibold mb-4">Review Contacts Before Sending</h3>
+            <div className="max-h-[70vh] overflow-y-auto mb-4">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50 sticky top-0">
+                  <tr>
+                    {previewData[0] && Object.keys(previewData[0]).map((header) => (
+                      <th key={header} className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        {header}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {previewData.map((row, idx) => (
+                    <tr key={idx} className="hover:bg-gray-50">
+                      {Object.values(row).map((value: any, cellIdx) => (
+                        <td key={cellIdx} className="px-4 py-2 text-sm text-gray-900 whitespace-nowrap">
+                          {value}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="flex justify-end gap-4">
+              <button
+                onClick={() => setShowPreviewDialog(false)}
+                className="w-12 h-12 flex items-center justify-center bg-red-50 hover:bg-red-100 border-2 border-red-500 rounded-lg transition-colors"
+              >
+                <span className="text-2xl text-red-600">✕</span>
+              </button>
+              <button
+                onClick={handleConfirmSend}
+                className="w-12 h-12 flex items-center justify-center bg-green-50 hover:bg-green-100 border-2 border-green-500 rounded-lg transition-colors"
+              >
+                <span className="text-2xl text-green-600">➣</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {emailStatus.length > 0 && (
+        <div className="fixed bottom-4 right-4 bg-white rounded-lg shadow-lg p-4 max-w-md max-h-96 overflow-y-auto">
+          <h4 className="font-semibold mb-2">Email Status</h4>
+          <div className="space-y-1">
+            {emailStatus.map((status, idx) => (
+              <p key={idx} className="text-sm text-gray-600">{status}</p>
+            ))}
+          </div>
+        </div>
+      )}
     </main>
   );
 }
