@@ -20,25 +20,10 @@ export default function Settings() {
   const [smtpServer, setSmtpServer] = useState("");
   const [smtpPort, setSmtpPort] = useState("");
   const [googleSheetUrl, setGoogleSheetUrl] = useState("");
-  const [selectedFileTypes, setSelectedFileTypes] = useState<string[]>(["png"]);
 
   const [visibleFields, setVisibleFields] = useState<{ [key: string]: boolean }>({});
   const [savedFields, setSavedFields] = useState<{ [key: string]: boolean }>({});
   const [savedSection, setSavedSection] = useState<null | string>(null);
-
-  const fileTypes = [
-    { id: "png", label: "PNG" },
-    { id: "jpg", label: "JPG" },
-    { id: "jpeg", label: "JPEG" }
-  ];
-
-  const toggleFileType = (type: string) => {
-    setSelectedFileTypes(prev => 
-      prev.includes(type) 
-        ? prev.filter(t => t !== type)
-        : [...prev, type]
-    );
-  };
 
   const toggleVisibility = (field: string) => {
     setVisibleFields((prev) => ({ ...prev, [field]: !prev[field] }));
@@ -61,7 +46,6 @@ export default function Settings() {
         setSmtpServer(data.smtp_server || "");
         setSmtpPort(data.smtp_port || "");
         setGoogleSheetUrl(data.google_sheet_url || "");
-        setSelectedFileTypes(data.watched_file_types || ["png"]);
 
         setSavedFields({
           uiform_api_key: !!data.uiform_api_key,
@@ -71,7 +55,6 @@ export default function Settings() {
           smtp_server: !!data.smtp_server,
           smtp_port: !!data.smtp_port,
           google_sheet_url: !!data.google_sheet_url,
-          watched_file_types: !!data.watched_file_types,
         });
       })
       .catch(err => {
@@ -97,7 +80,6 @@ export default function Settings() {
             smtp_server: smtpServer,
             smtp_port: smtpPort,
             google_sheet_url: googleSheetUrl,
-            watched_file_types: selectedFileTypes,
           },
         }),
       });
@@ -117,9 +99,6 @@ export default function Settings() {
           smtp_server: true,
           smtp_port: true,
         }),
-        ...(section === "File Types" && {
-          watched_file_types: true,
-        })
       }));
     } catch (err) {
       console.error("Save error:", err);
@@ -170,25 +149,35 @@ export default function Settings() {
             </p>
           </div>
 
-          <section className="bg-white border border-gray-200 rounded-xl p-6 shadow space-y-4">
+          <section className="bg-white border border-gray-200 rounded-xl p-4 shadow space-y-2">
             <h2 className="text-lg font-semibold flex items-center gap-2">
               <Image src="/uiform-logo.png" alt="UiForm" width={20} height={20} />
               UiForm API Key
             </h2>
             {renderField("uiform_api_key", uiFormKey, (e) => setUiFormKey(e.target.value), "sk_uiform_...", "password")}
-            <Button onClick={() => save("UiForm API Key")} className="mt-2">Save</Button>
+            <Button 
+              onClick={() => save("UiForm API Key")} 
+              className="mt-1 bg-transparent text-black hover:bg-transparent hover:text-black cursor-pointer border-0"
+            >
+              Save
+            </Button>
           </section>
 
-          <section className="bg-white border border-gray-200 rounded-xl p-6 shadow space-y-4">
+          <section className="bg-white border border-gray-200 rounded-xl p-4 shadow space-y-2">
             <h2 className="text-lg font-semibold flex items-center gap-2">
               <Image src="/openai-logo.png" alt="OpenAI" width={20} height={20} />
               OpenAI API Key
             </h2>
             {renderField("openai_api_key", openAiKey, (e) => setOpenAiKey(e.target.value), "sk-...", "password")}
-            <Button onClick={() => save("OpenAI API Key")} className="mt-2">Save</Button>
+            <Button 
+              onClick={() => save("OpenAI API Key")} 
+              className="mt-1 bg-transparent text-black hover:bg-transparent hover:text-black cursor-pointer border-0"
+            >
+              Save
+            </Button>
           </section>
 
-          <section className="bg-white border border-gray-200 rounded-xl p-6 shadow space-y-4">
+          <section className="bg-white border border-gray-200 rounded-xl p-4 shadow space-y-2">
             <h2 className="text-lg font-semibold flex items-center gap-2">
               <Image src="/googlesheet-logo.png" alt="Google" width={20} height={20} />
               Google Sheet URL
@@ -196,7 +185,12 @@ export default function Settings() {
             <div className="space-y-2">
               {renderField("google_sheet_url", googleSheetUrl, (e) => setGoogleSheetUrl(e.target.value), "https://docs.google.com/...")}
               <div className="flex justify-between items-center">
-                <Button onClick={() => save("Google Sheet URL")}>Save</Button>
+                <Button 
+                  onClick={() => save("Google Sheet URL")}
+                  className="bg-transparent text-black hover:bg-transparent hover:text-black cursor-pointer border-0"
+                >
+                  Save
+                </Button>
                 {googleSheetUrl && (
                   <a
                     href={googleSheetUrl}
@@ -219,38 +213,18 @@ export default function Settings() {
               {renderField("smtp_pass", emailPass, (e) => setEmailPass(e.target.value), "Your SMTP password", "password")}
               {renderField("smtp_server", smtpServer, (e) => setSmtpServer(e.target.value), "smtp.gmail.com")}
               {renderField("smtp_port", smtpPort, (e) => setSmtpPort(e.target.value), "587")}
-              <Button onClick={() => save("Email Settings")}>Save</Button>
+              <Button 
+                onClick={() => save("Email Settings")}
+                className="bg-transparent text-black hover:bg-transparent hover:text-black cursor-pointer border-0"
+              >
+                Save
+              </Button>
             </div>
           </section>
 
-          <section className="bg-white border border-gray-200 rounded-xl p-6 shadow space-y-4">
-            <h2 className="text-lg font-semibold">Watched File Types</h2>
+          <section className="bg-white border border-0 rounded-xl p-6 space-y-4">
+            <h2 className="text-lg "></h2>
             <div className="space-y-4">
-              <div className="flex flex-wrap gap-2">
-                {fileTypes.map((type) => (
-                  <Button
-                    key={type.id}
-                    variant={selectedFileTypes.includes(type.id) ? "default" : "outline"}
-                    onClick={() => toggleFileType(type.id)}
-                  >
-                    {type.label}
-                  </Button>
-                ))}
-              </div>
-              {selectedFileTypes.length === 0 && (
-                <p className="text-sm text-red-500">Please select at least one file type</p>
-              )}
-              <div className="flex items-center gap-2">
-                <Button 
-                  onClick={() => save("File Types")}
-                  disabled={selectedFileTypes.length === 0}
-                >
-                  Save File Types
-                </Button>
-                {savedSection === "File Types" && (
-                  <span className="text-sm text-green-600">✓ Saved</span>
-                )}
-              </div>
             </div>
           </section>
         </div>

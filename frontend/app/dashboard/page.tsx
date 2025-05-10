@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { FolderOpen } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 
 interface Session {
   user?: {
@@ -28,173 +29,136 @@ interface UserSettings {
 export default function DashboardPage() {
   const { data: session, status } = useSession() as { data: Session | null, status: string };
   const router = useRouter();
+
   const [isWatching, setIsWatching] = useState(false);
+  const [watchFolder, setWatchFolder] = useState("/Users/victorsoto/Downloads");
+  const [watcherSessionId, setWatcherSessionId] = useState<string | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
   const [isSending, setIsSending] = useState(false);
-  const [watchFolder, setWatchFolder] = useState("/Users/victorsoto/Downloads");
   const [settings, setSettings] = useState<UserSettings>({});
   const [contactPreview, setContactPreview] = useState<any[]>([]);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
-  const [selectedFileTypes, setSelectedFileTypes] = useState<string[]>(["png"]);
-  const [savedSection, setSavedSection] = useState<null | string>(null);
-  const [isFileTypesExpanded, setIsFileTypesExpanded] = useState(false);
 
-  const fileTypes = [
-    { id: "png", label: "PNG" },
-    { id: "jpg", label: "JPG" },
-    { id: "jpeg", label: "JPEG" }
-  ];
-
-  const toggleFileType = (type: string) => {
-    setSelectedFileTypes(prev => 
-      prev.includes(type) 
-        ? prev.filter(t => t !== type)
-        : [...prev, type]
-    );
-  };
-
-  const saveFileTypes = async () => {
-    if (!session?.user?.email) return;
+  const toggleWatcher = async (checked: boolean) => {
+    const endpoint = checked ? "/watcher/start" : "/watcher/stop";
+    const payload = {
+      email: session?.user?.email,
+      ...(checked
+        ? { 
+            watchFolder, 
+            fileTypes: ["png"],
+            extensions: [".png"]
+          }
+        : { sessionId: watcherSessionId }),
+    };
 
     try {
-      const res = await fetch("http://localhost:8000/config", {
+      const res = await fetch(`http://localhost:8000${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: session.user.email,
-          config: {
-            ...settings,
-            watched_file_types: selectedFileTypes,
-          },
-        }),
+        body: JSON.stringify(payload),
       });
-
-      if (!res.ok) throw new Error("Save failed");
-      setSavedSection("File Types");
-      setTimeout(() => setSavedSection(null), 3000);
-      toast.success("✓ File types saved");
-      setSettings(prev => ({ ...prev, watched_file_types: selectedFileTypes }));
-    } catch (err) {
-      console.error("Save error:", err);
-      toast.error("Failed to save file types");
-    }
-  };
-
-  useEffect(() => {
-    if (status === "unauthenticated") router.push("/");
-    if (session?.user?.email) {
-      fetchSettings();
-    }
-  }, [status, router, session]);
-
-  const fetchSettings = async () => {
-    try {
-      const response = await fetch(`http://localhost:8000/config?email=${session?.user?.email}`);
-      if (response.ok) {
-        const data = await response.json();
-        console.log('Fetched settings:', data);
-        setSettings(data);
-        setSelectedFileTypes(data.watched_file_types || ["png"]);
+      
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(errorText);
       }
-    } catch (error) {
-      console.error('Failed to fetch settings:', error);
-    }
-  };
+      
+      const data = await res.json();
 
-  const fetchContactPreview = async () => {
-    if (!settings.googleSheetUrl) return;
-    setIsLoadingPreview(true);
-    try {
-      const response = await fetch(`http://localhost:8000/sheet-preview?url=${encodeURIComponent(settings.googleSheetUrl)}`);
-      if (response.ok) {
-        const data = await response.json();
-        setContactPreview(data);
-      }
-    } catch (error) {
-      console.error('Failed to fetch contact preview:', error);
-      toast.error('Failed to load contact preview');
-    } finally {
-      setIsLoadingPreview(false);
-    }
-  };
-
-  useEffect(() => {
-    if (settings.googleSheetUrl) {
-      fetchContactPreview();
-    }
-  }, [settings.googleSheetUrl]);
-
-  const startWatcher = async () => {
-    try {
-      const response = await fetch("http://localhost:8000/watcher/start", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          watchFolder: watchFolder,
-          email: session?.user?.email,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to start watcher");
-      }
-
-      setIsWatching(true);
-      toast.success("Watcher started successfully");
-    } catch (error) {
-      console.error("Error starting watcher:", error);
-      toast.error("Failed to start watcher");
-    }
-  };
-
-  const handleStopWatching = async () => {
-    try {
-      const response = await fetch('http://localhost:8000/watcher/stop', { method: 'POST' });
-      if (response.ok) {
+      if (checked) {
+        setWatcherSessionId(data.sessionId);
+        setIsWatching(true);
+        toast.success("PNG file watcher started");
+      } else {
+        setWatcherSessionId(null);
         setIsWatching(false);
-        toast.success('Stopped watching for screenshots');
+        toast.success("PNG file watcher stopped");
       }
-    } catch (error) {
-      toast.error('Failed to stop watcher');
+    } catch (err) {
+      console.error("Watcher error:", err);
+      toast.error(err instanceof Error ? err.message : "Failed to toggle watcher");
+      // Revert the switch state if there was an error
+      setIsWatching(!checked);
     }
   };
 
   const handleSelectFolder = async () => {
+    if (isWatching) {
+      toast.error("Stop the watcher first");
+      return;
+    }
+
     try {
-      const response = await fetch('http://localhost:8000/select-folder', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+      const res = await fetch("http://localhost:8000/select-folder", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
       });
-      const data = await response.json();
-      
-      if (response.ok && data.folder) {
+      const data = await res.json();
+      if (res.ok && data.folder) {
         setWatchFolder(data.folder);
-        toast.success('Folder selected successfully');
+        toast.success("Folder selected");
       } else {
-        toast.error(data.error || 'Failed to select folder');
+        toast.error(data.error || "Failed to select folder");
       }
-    } catch (error) {
-      console.error('Folder selection error:', error);
-      toast.error('Failed to select folder');
+    } catch (err) {
+      console.error("Folder selection error:", err);
+      toast.error("Failed to select folder");
     }
   };
 
   const handleDownload = async () => {
     setIsDownloading(true);
     try {
-      const response = await fetch('/api/contacts/download', { method: 'POST' });
+      // First get the user's Google Sheet URL from config
+      const configResponse = await fetch(`http://localhost:8000/config?email=${session?.user?.email}`);
+      if (!configResponse.ok) {
+        throw new Error('Failed to fetch configuration');
+      }
+      const config = await configResponse.json();
+
+      if (!config.google_sheet_url) {
+        throw new Error('Google Sheet URL not configured');
+      }
+
+      // Then download the contacts
+      const response = await fetch('http://localhost:8000/download-contacts', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          email: session?.user?.email,
+          sheet_url: config.google_sheet_url
+        })
+      });
+      
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(error);
+      }
+
       const data = await response.json();
-      if (response.ok) {
-        toast.success('Contact list downloaded successfully');
-      } else {
-        toast.error(data.error || 'Failed to download contact list');
+      toast.success('Contact list downloaded successfully');
+      
+      // Refresh the contact preview
+      if (config.google_sheet_url) {
+        setIsLoadingPreview(true);
+        try {
+          const previewResponse = await fetch(`http://localhost:8000/sheet-preview?url=${encodeURIComponent(config.google_sheet_url)}`);
+          if (previewResponse.ok) {
+            const previewData = await previewResponse.json();
+            setContactPreview(previewData || []);
+          }
+        } catch (error) {
+          console.error('Failed to refresh preview:', error);
+        } finally {
+          setIsLoadingPreview(false);
+        }
       }
     } catch (error) {
-      toast.error('Failed to download contact list');
+      console.error('Download error:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to download contact list');
     } finally {
       setIsDownloading(false);
     }
@@ -203,19 +167,34 @@ export default function DashboardPage() {
   const handleSendEmails = async () => {
     setIsSending(true);
     try {
-      const response = await fetch('/api/emails/send', { method: 'POST' });
-      const data = await response.json();
-      if (response.ok) {
-        toast.success('Emails sent successfully');
-      } else {
-        toast.error(data.error || 'Failed to send emails');
+      const response = await fetch('http://localhost:8000/send-emails', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          email: session?.user?.email
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(error);
       }
+
+      const data = await response.json();
+      toast.success('Emails sent successfully');
     } catch (error) {
-      toast.error('Failed to send emails');
+      console.error('Send emails error:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to send emails');
     } finally {
       setIsSending(false);
     }
   };
+
+  useEffect(() => {
+    if (status === "unauthenticated") router.push("/");
+  }, [status, router]);
 
   if (status === "loading") return <div>Loading...</div>;
   if (!session) return null;
@@ -226,54 +205,50 @@ export default function DashboardPage() {
         <div className="w-full max-w-4xl space-y-8">
           <h1 className="text-2xl font-semibold">⌟ Dashboard</h1>
 
-          {/* Status Section */}
           <Card>
             <CardContent className="p-6 space-y-4">
-              <h2 className="text-lg font-semibold">Status</h2>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm text-gray-700">
                 <div>
+                  <h2 className="block text-l font-light text-black">
+                    Bucket Folder Watcher
+                  </h2>
                   <span className="block text-xl font-bold text-[#1C65BD]">
                     {isWatching ? "Active" : "Inactive"}
                   </span>
-                  Screenshot Watcher
                 </div>
                 <div>
+                  <h2 className="block text-l font-light text-black">
+                    Contacts Processed
+                  </h2>
                   <span className="block text-xl font-bold text-[#1C65BD]">0</span>
-                  Contacts Processed
                 </div>
                 <div>
+                  <h2 className="block text-l font-light text-black">
+                    Emails Sent
+                  </h2>
                   <span className="block text-xl font-bold text-[#1C65BD]">0</span>
-                  Emails Sent
                 </div>
               </div>
             </CardContent>
           </Card>
           
-          {/* Step 1: Watch Screenshots */}
           <Card>
             <CardContent className="p-6 space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-lg font-semibold">1. Watch Screenshots</h2>
-                  <p className="text-sm text-gray-600 mt-1">
-                    Automatically process screenshots from your selected folder
-                  </p>
+                  <h2 className="text-lg font-semibold">1. PNG File Watcher</h2>
                 </div>
-                <div className="flex gap-2">
-                  <Button 
-                    onClick={startWatcher}
-                    disabled={isWatching}
-                    variant={isWatching ? "outline" : "default"}
-                  >
-                    {isWatching ? "◉ Watching..." : "◉ Start Watching"}
-                  </Button>
-                  <Button 
-                    onClick={handleStopWatching}
-                    disabled={!isWatching}
-                    variant="destructive"
-                  >
-                    ◎ Stop
-                  </Button>
+                <div className="flex items-center gap-3">
+                  <span className="text-sm text-gray-600">Automatically process PNG files from your selected folder:</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-500">Off</span>
+                    <Switch
+                      checked={isWatching}
+                      onCheckedChange={toggleWatcher}
+                      disabled={isWatching && !watcherSessionId}
+                    />
+                    <span className="text-sm text-gray-500">On</span>
+                  </div>
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -309,7 +284,7 @@ export default function DashboardPage() {
                         Drop your documents (e.g. Screenshots) in the selected folder to process them automatically.
                       </p>
                       <p className="text-sm text-blue-600">
-                        Supported formats: PNG, JPG, JPEG
+                        Supported formats: PNG
                       </p>
                       <div className="text-sm text-blue-600 space-y-1">
                         <p>
@@ -337,73 +312,9 @@ export default function DashboardPage() {
                   </div>
                 </div>
               )}
-              <section className="bg-white border border-gray-200 rounded-xl p-6 shadow space-y-4">
-                <div 
-                  className="flex items-center justify-between cursor-pointer"
-                  onClick={() => setIsFileTypesExpanded(!isFileTypesExpanded)}
-                >
-                  <h2 className="text-lg font-semibold flex items-center gap-2">
-                    ❏ File Types To Process
-                  </h2>
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className={`transform transition-transform ${isFileTypesExpanded ? 'rotate-180' : ''}`}
-                  >
-                    <path d="m6 9 6 6 6-6"/>
-                  </svg>
-                </div>
-                {isFileTypesExpanded && (
-                  <div className="space-y-4 pt-4">
-                    <div className="flex items-center gap-4">
-                      <p className="text-sm text-gray-600 whitespace-nowrap">
-                        Select the file types to watch for in your selected folder:
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        {fileTypes.map((type) => (
-                          <button
-                            key={type.id}
-                            onClick={() => toggleFileType(type.id)}
-                            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                              selectedFileTypes.includes(type.id)
-                                ? "bg-blue-500 text-white border border-blue-600"
-                                : "bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200"
-                            }`}
-                          >
-                            {type.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    {selectedFileTypes.length === 0 && (
-                      <p className="text-sm text-red-500">Please select at least one file type</p>
-                    )}
-                    <div className="flex items-center gap-2">
-                      <Button 
-                        onClick={saveFileTypes}
-                        disabled={selectedFileTypes.length === 0}
-                        className="mt-2"
-                      >
-                        Save File Types
-                      </Button>
-                      {savedSection === "File Types" && (
-                        <span className="text-sm text-green-600">✓ Saved</span>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </section>
             </CardContent>
           </Card>
 
-          {/* Step 2: Download Contact List */}
           <Card>
             <CardContent className="p-6 space-y-4">
               <div className="flex items-center justify-between">
@@ -416,8 +327,10 @@ export default function DashboardPage() {
                 <Button 
                   onClick={handleDownload}
                   disabled={isDownloading}
+                  variant="outline"
+                  className="border-2 hover:bg-gray-50"
                 >
-                  {isDownloading ? "↓ Downloading..." : "↓ Download List"}
+                  {isDownloading ? "Downloading..." : "Download List ↓"}
                 </Button>
               </div>
               {settings.googleSheetUrl && (
@@ -427,7 +340,7 @@ export default function DashboardPage() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={fetchContactPreview}
+                      onClick={() => {}}
                       disabled={isLoadingPreview}
                     >
                       {isLoadingPreview ? "Refreshing..." : "Refresh"}
@@ -468,7 +381,6 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          {/* Step 3: Send Emails */}
           <Card>
             <CardContent className="p-6 space-y-4">
               <div className="flex items-center justify-between">
@@ -481,8 +393,10 @@ export default function DashboardPage() {
                 <Button 
                   onClick={handleSendEmails}
                   disabled={isSending}
+                  variant="outline"
+                  className="border-2 hover:bg-gray-50"
                 >
-                  {isSending ? "➢ Sending..." : "➢ Send Emails"}
+                  {isSending ? "Sending..." : "Send Emails ➢"}
                 </Button>
               </div>
             </CardContent>

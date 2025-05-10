@@ -86,7 +86,6 @@ watch_script = os.path.join(SCRIPTS_DIR, "watch_folder.py")
 
 logs_folder = os.path.join(PROJECT_DIR, "logs")
 output_folder = os.path.join(PROJECT_DIR, "output")
-contact_list_folder = os.path.join(PROJECT_DIR, "contact_lists")
 
 # === Core Functions ===
 def run_script(script_path):
@@ -130,8 +129,7 @@ def get_folder_paths():
     """Return paths to important folders."""
     return {
         "logs": logs_folder,
-        "output": output_folder,
-        "contact_list": contact_list_folder
+        "output": output_folder
     }
 
 # Track active watcher process
@@ -229,8 +227,8 @@ async def download_contacts(request: Request):
 async def get_sheet_preview(url: str):
     """Get a preview of the first 5 rows from the Google Sheet."""
     try:
-        from scripts.download_contacts import get_sheet_data
-        data = get_sheet_data(url, max_rows=5)
+        from scripts.download_contacts import get_sheet_preview
+        data = get_sheet_preview(url, rows=5)
         return data
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) 

@@ -2,18 +2,12 @@ import pandas as pd
 import os
 import requests
 from datetime import datetime
-from dotenv import load_dotenv
 import sys
 import re
 
 # === Load environment and paths ===
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-load_dotenv(os.path.join(ROOT_DIR, ".env"))
-
-CONTACT_DIR = os.path.join(ROOT_DIR, "backend", "contact_lists")
-OLD_DIR = os.path.join(CONTACT_DIR, "_Old")
-DEST_PATH = os.path.join(CONTACT_DIR, "contact_list.csv")
-TEMP_PATH = os.path.join(CONTACT_DIR, "temp_download.csv")
+DOWNLOADS_PATH = os.path.expanduser("~/Downloads/contact_list.xlsx")
 
 COLUMNS_TO_KEEP = ["first_name", "last_name", "email", "company", "role", "education", "location"]
 
@@ -34,31 +28,18 @@ def download_and_clean_sheet(sheet_url=None, confirm=True):
         raise ValueError("Sheet URL is required")
 
     if confirm:
-        user_input = input("⚠️  This will overwrite your current contact_list.csv.\n💡 A backup will be saved in '_Old'.\nType \"yes\" to proceed: ").strip().lower()
+        user_input = input("⚠️  This will overwrite your current contact_list.xlsx in Downloads.\nType \"yes\" to proceed: ").strip().lower()
         if user_input != "yes":
             print("❌ Aborted by user.")
             return
-
-    os.makedirs(CONTACT_DIR, exist_ok=True)
-
-    if os.path.exists(DEST_PATH):
-        os.makedirs(OLD_DIR, exist_ok=True)
-        timestamp = datetime.now().strftime("%Y-%m-%d_%H%M")
-        backup_filename = f"contact_list_{timestamp}.csv"
-        backup_path = os.path.join(OLD_DIR, backup_filename)
-        os.rename(DEST_PATH, backup_path)
-        print(f"↩︎ Backed up old contact list to: {backup_path}")
 
     print("⏏︎ Downloading Google Sheet...")
     csv_url = get_sheet_csv_url(sheet_url)
     response = requests.get(csv_url, timeout=10)
     response.raise_for_status()
 
-    with open(TEMP_PATH, "wb") as f:
-        f.write(response.content)
-
-    print("⌁ Cleaning and filtering columns...")
-    df = pd.read_csv(TEMP_PATH)
+    # Read directly from the response content
+    df = pd.read_csv(pd.io.common.StringIO(response.text))
 
     missing = [col for col in COLUMNS_TO_KEEP if col not in df.columns]
     if missing:
@@ -66,10 +47,10 @@ def download_and_clean_sheet(sheet_url=None, confirm=True):
         return
 
     df = df[COLUMNS_TO_KEEP]
-    df.to_csv(DEST_PATH, index=False)
-    os.remove(TEMP_PATH)
-
-    print(f"✓ Saved cleaned contact list to: {DEST_PATH}")
+    
+    # Save to Downloads folder as Excel
+    df.to_excel(DOWNLOADS_PATH, index=False, engine='openpyxl')
+    print(f"✓ Saved contact list to Downloads: {DOWNLOADS_PATH}")
 
 def get_sheet_preview(sheet_url, rows=5):
     """Get a preview of the sheet data"""
