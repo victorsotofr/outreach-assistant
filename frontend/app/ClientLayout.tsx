@@ -5,7 +5,7 @@ import React, { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { Navbar } from "@/components/navbar";
-import { cn } from "@/lib/utils";
+import { cn } from "@/app/lib/utils";
 
 function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession();
