@@ -1,15 +1,17 @@
+import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
-import type { NextRequest } from 'next/server';
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { name: string } }
+  context: { params: { name: string } }
 ) {
+  const { name } = context.params;
+
   try {
-    const templatesDir = path.join(process.cwd(), '..', 'backend', 'templates');
-    const filePath = path.join(templatesDir, params.name);
+    const templatesDir = path.join(process.cwd(), 'backend', 'templates');
+    const filePath = path.join(templatesDir, name);
 
     if (!fs.existsSync(filePath)) {
       return NextResponse.json({ error: 'Template not found' }, { status: 404 });
