@@ -79,39 +79,78 @@ def upload_file(file_path):
         log_event("error", file_path, str(e))
         notify("Upload Error", os.path.basename(file_path))
 
-def watch_folder(folder_path):
-    print(f"→ Watching folder: {folder_path}")
-    processed_files = set()
-    
-    while True:
-        try:
-            files = [
-                f for f in os.listdir(folder_path)
-                if f.lower().endswith(tuple(SUPPORTED_EXTENSIONS))
-            ]
-            
-            for file_name in files:
-                file_path = os.path.join(folder_path, file_name)
-                
-                if file_path in processed_files or not os.path.exists(file_path):
-                    continue
-                    
-                try:
-                    upload_file(file_path)
-                    processed_files.add(file_path)
-                except Exception as e:
-                    print(f"⚠️ Error processing {file_name}: {str(e)}")
-                    
-        except Exception as e:
-            print(f"⚠️ Folder watch error: {e}")
+class ImageHandler(FileSystemEventHandler):
+    def __init__(self, folder_path, email):
+        self.folder_path = folder_path
+        self.email = email
+        self.processed_files = set()  # Keep track of processed files
+        self.last_processed_time = {}  # Keep track of last processed time for each file
 
-        time.sleep(POLL_INTERVAL_SECONDS)
+    def on_created(self, event):
+        if event.is_directory:
+            return
+
+        if not event.src_path.lower().endswith('.png'):
+            return
+
+        # Get file name and current time
+        file_name = os.path.basename(event.src_path)
+        # Remove any leading dots from the filename
+        file_name = file_name.lstrip('.')
+        current_time = time.time()
+
+        # Check if we've processed this file recently (within last 5 seconds)
+        if file_name in self.last_processed_time:
+            if current_time - self.last_processed_time[file_name] < 5:
+                return
+
+        # Check if we've already processed this file
+        if file_name in self.processed_files:
+            return
+
+        try:
+            # Process the file
+            file_path = os.path.join(self.folder_path, file_name)
+            if not os.path.exists(file_path):
+                print(f"File not found: {file_path}")
+                return
+
+            with open(file_path, 'rb') as f:
+                files = {'file': (file_name, f, 'image/png')}
+                headers = {"Api-Key": UIFORM_API_KEY}
+                response = requests.post(
+                    UIFORM_API_ENDPOINT,
+                    headers=headers,
+                    files=files
+                )
+                response.raise_for_status()
+                print(f"✓ Uploaded: {file_name}")
+                
+                # Mark file as processed and update last processed time
+                self.processed_files.add(file_name)
+                self.last_processed_time[file_name] = current_time
+
+        except Exception as e:
+            print(f"Error processing {file_name}: {e}")
+
+def watch_folder(folder_path, email):
+    event_handler = ImageHandler(folder_path, email)
+    observer = Observer()
+    observer.schedule(event_handler, folder_path, recursive=False)
+    observer.start()
+
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        observer.stop()
+    observer.join()
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:
-        print("Usage: python watch_folder.py <watch_folder> <email>")
+        print("Usage: python watch_folder.py <folder_path> <email>")
         sys.exit(1)
     
-    folder_to_watch = sys.argv[1]
+    folder_path = sys.argv[1]
     email = sys.argv[2]
-    watch_folder(folder_to_watch)
+    watch_folder(folder_path, email)

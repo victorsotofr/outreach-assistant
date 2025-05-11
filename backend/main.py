@@ -227,13 +227,6 @@ async def download_contacts(request: Request):
         if not email or not sheet_url:
             raise HTTPException(status_code=400, detail="Email and sheet URL are required")
 
-        if active_watcher and active_watcher.is_alive():
-            return {
-                "error": True,
-                "message": "Please stop the watcher before downloading contacts",
-                "type": "watcher_running"
-            }
-
         if action == "delete":
             delete_processed_files()
 
@@ -288,13 +281,6 @@ async def send_emails(request: Request):
 
         if not email or not sheet_url:
             raise HTTPException(status_code=400, detail="Email and sheet URL are required")
-
-        if active_watcher and active_watcher.is_alive():
-            return {
-                "error": True,
-                "message": "Please stop the watcher before sending emails",
-                "type": "watcher_running"
-            }
 
         if action == "delete":
             delete_processed_files()

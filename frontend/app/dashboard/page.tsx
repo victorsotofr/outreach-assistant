@@ -509,7 +509,7 @@ export default function DashboardPage() {
 
                 <button
                   onClick={handleDownload}
-                  disabled={isDownloading}
+                  disabled={isDownloading || !config?.google_sheet_url || isWatching}
                   className={`flex flex-col items-center justify-center p-6 rounded-xl transition-all duration-200 ${
                     isDownloading
                       ? 'bg-blue-50 border-2 border-blue-500'
@@ -524,7 +524,7 @@ export default function DashboardPage() {
 
                 <button
                   onClick={handleSendEmails}
-                  disabled={isSending}
+                  disabled={isSending || !config?.google_sheet_url || isWatching}
                   className={`flex flex-col items-center justify-center p-6 rounded-xl transition-all duration-200 ${
                     isSending
                       ? 'bg-purple-50 border-2 border-purple-500'
