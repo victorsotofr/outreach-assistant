@@ -153,72 +153,195 @@ export default function Settings() {
             <h2 className="text-lg font-semibold flex items-center gap-2">
               <Image src="/uiform-logo.png" alt="UiForm" width={20} height={20} />
               UiForm API Key
+              {savedFields["uiform_api_key"] && (
+                <span className="text-green-500">✓</span>
+              )}
             </h2>
-            {renderField("uiform_api_key", uiFormKey, (e) => setUiFormKey(e.target.value), "sk_uiform_...", "password")}
-            <Button 
-              onClick={() => save("UiForm API Key")} 
-              className="mt-1 bg-transparent text-black hover:bg-transparent hover:text-black cursor-pointer border-0"
-            >
-              Save
-            </Button>
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <Input
+                    id="uiform"
+                    type="password"
+                    value={uiFormKey}
+                    onChange={(e) => setUiFormKey(e.target.value)}
+                    placeholder="uf-..."
+                    className="flex-1"
+                  />
+                  <Button
+                    onClick={() => save("UiForm API Key")}
+                    disabled={!uiFormKey}
+                    variant="outline"
+                  >
+                    Save
+                  </Button>
+                </div>
+              </div>
+            </div>
           </section>
 
           <section className="bg-white border border-gray-200 rounded-xl p-4 shadow space-y-2">
             <h2 className="text-lg font-semibold flex items-center gap-2">
               <Image src="/openai-logo.png" alt="OpenAI" width={20} height={20} />
               OpenAI API Key
+              {savedFields["openai_api_key"] && (
+                <span className="text-green-500">✓</span>
+              )}
             </h2>
-            {renderField("openai_api_key", openAiKey, (e) => setOpenAiKey(e.target.value), "sk-...", "password")}
-            <Button 
-              onClick={() => save("OpenAI API Key")} 
-              className="mt-1 bg-transparent text-black hover:bg-transparent hover:text-black cursor-pointer border-0"
-            >
-              Save
-            </Button>
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <Input
+                    id="openai"
+                    type="password"
+                    value={openAiKey}
+                    onChange={(e) => setOpenAiKey(e.target.value)}
+                    placeholder="sk-..."
+                    className="flex-1"
+                  />
+                  <Button
+                    onClick={() => save("OpenAI API Key")}
+                    disabled={!openAiKey}
+                    variant="outline"
+                  >
+                    Save
+                  </Button>
+                </div>
+              </div>
+            </div>
           </section>
 
           <section className="bg-white border border-gray-200 rounded-xl p-4 shadow space-y-2">
-            <h2 className="text-lg font-semibold flex items-center gap-2">
-              <Image src="/googlesheet-logo.png" alt="Google" width={20} height={20} />
-              Google Sheet URL
-            </h2>
-            <div className="space-y-2">
-              {renderField("google_sheet_url", googleSheetUrl, (e) => setGoogleSheetUrl(e.target.value), "https://docs.google.com/...")}
-              <div className="flex justify-between items-center">
-                <Button 
-                  onClick={() => save("Google Sheet URL")}
-                  className="bg-transparent text-black hover:bg-transparent hover:text-black cursor-pointer border-0"
-                >
-                  Save
-                </Button>
-                {googleSheetUrl && (
-                  <a
-                    href={googleSheetUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm text-blue-600 hover:text-blue-800 hover:underline transition-colors"
-                    title="Open Google Sheet"
-                  >
-                    Open Google Sheet
-                  </a>
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold flex items-center gap-2">
+                <Image src="/googlesheet-logo.png" alt="Google" width={20} height={20} />
+                Google Sheet URL
+                {savedFields["google_sheet_url"] && (
+                  <span className="text-green-500">✓</span>
                 )}
+              </h2>
+              {googleSheetUrl && (
+                <a
+                  href={googleSheetUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-blue-600 hover:text-blue-800 hover:underline transition-colors"
+                  title="Open Google Sheet"
+                >
+                  Open Google Sheet
+                </a>
+              )}
+            </div>
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <Input
+                    id="sheet"
+                    type="text"
+                    value={googleSheetUrl}
+                    onChange={(e) => setGoogleSheetUrl(e.target.value)}
+                    placeholder="https://docs.google.com/spreadsheets/d/..."
+                    className="flex-1"
+                  />
+                  <Button
+                    onClick={() => save("Google Sheet URL")}
+                    disabled={!googleSheetUrl}
+                    variant="outline"
+                  >
+                    Save
+                  </Button>
+                </div>
               </div>
             </div>
           </section>
 
           <section className="bg-white border border-gray-200 rounded-xl p-6 shadow space-y-4">
-            <h2 className="text-lg font-semibold">Email Settings</h2>
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              Email Settings
+              {savedFields["smtp_user"] && savedFields["smtp_pass"] && savedFields["smtp_server"] && savedFields["smtp_port"] && (
+                <span className="text-green-500">✓</span>
+              )}
+            </h2>
             <div className="space-y-4">
-              {renderField("smtp_user", emailUser, (e) => setEmailUser(e.target.value), "your@email.com")}
-              {renderField("smtp_pass", emailPass, (e) => setEmailPass(e.target.value), "Your SMTP password", "password")}
-              {renderField("smtp_server", smtpServer, (e) => setSmtpServer(e.target.value), "smtp.gmail.com")}
-              {renderField("smtp_port", smtpPort, (e) => setSmtpPort(e.target.value), "587")}
-              <Button 
-                onClick={() => save("Email Settings")}
-                className="bg-transparent text-black hover:bg-transparent hover:text-black cursor-pointer border-0"
-              >
-                Save
-              </Button>
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <Input
+                    id="emailUser"
+                    type="text"
+                    value={emailUser}
+                    onChange={(e) => setEmailUser(e.target.value)}
+                    placeholder="your@email.com"
+                    className="flex-1"
+                  />
+                  <Button
+                    onClick={() => save("Email Settings")}
+                    disabled={!emailUser}
+                    variant="outline"
+                  >
+                    Save
+                  </Button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <Input
+                    id="emailPass"
+                    type="password"
+                    value={emailPass}
+                    onChange={(e) => setEmailPass(e.target.value)}
+                    placeholder="Enter your SMTP password"
+                    className="flex-1"
+                  />
+                  <Button
+                    onClick={() => save("Email Settings")}
+                    disabled={!emailPass}
+                    variant="outline"
+                  >
+                    Save
+                  </Button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <Input
+                    id="smtpServer"
+                    type="text"
+                    value={smtpServer}
+                    onChange={(e) => setSmtpServer(e.target.value)}
+                    placeholder="smtp.gmail.com"
+                    className="flex-1"
+                  />
+                  <Button
+                    onClick={() => save("Email Settings")}
+                    disabled={!smtpServer}
+                    variant="outline"
+                  >
+                    Save
+                  </Button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <Input
+                    id="smtpPort"
+                    type="text"
+                    value={smtpPort}
+                    onChange={(e) => setSmtpPort(e.target.value)}
+                    placeholder="587"
+                    className="flex-1"
+                  />
+                  <Button
+                    onClick={() => save("Email Settings")}
+                    disabled={!smtpPort}
+                    variant="outline"
+                  >
+                    Save
+                  </Button>
+                </div>
+              </div>
             </div>
           </section>
 

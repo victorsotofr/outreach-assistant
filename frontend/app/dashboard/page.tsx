@@ -32,7 +32,7 @@ export default function DashboardPage() {
   const router = useRouter();
 
   const [isWatching, setIsWatching] = useState(false);
-  const [watchFolder, setWatchFolder] = useState("/Users/victorsoto/Downloads");
+  const [watchFolder, setWatchFolder] = useState("");
   const [watcherSessionId, setWatcherSessionId] = useState<string | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
   const [isSending, setIsSending] = useState(false);
@@ -45,6 +45,8 @@ export default function DashboardPage() {
   const [emailStatus, setEmailStatus] = useState<string[]>([]);
   const [contactsProcessed, setContactsProcessed] = useState(0);
   const [emailsSent, setEmailsSent] = useState(0);
+  const [missingSettings, setMissingSettings] = useState<string[]>([]);
+  const [isFolderValidated, setIsFolderValidated] = useState(false);
 
   const toggleWatcher = async (checked: boolean) => {
     const endpoint = checked ? "/watcher/start" : "/watcher/stop";
@@ -104,6 +106,7 @@ export default function DashboardPage() {
       const data = await res.json();
       if (res.ok && data.folder) {
         setWatchFolder(data.folder);
+        setIsFolderValidated(true);
         toast.success("Folder selected");
       } else {
         toast.error(data.error || "Failed to select folder");
@@ -117,7 +120,6 @@ export default function DashboardPage() {
   const handleDownload = async () => {
     setIsDownloading(true);
     try {
-      // First get the user's Google Sheet URL from config
       const configResponse = await fetch(`http://localhost:8000/config?email=${session?.user?.email}`);
       if (!configResponse.ok) {
         throw new Error('Failed to fetch configuration');
@@ -128,7 +130,6 @@ export default function DashboardPage() {
         throw new Error('Google Sheet URL not configured');
       }
 
-      // Then download the contacts
       const response = await fetch('http://localhost:8000/download-contacts', {
         method: 'POST',
         headers: { 
@@ -189,7 +190,7 @@ export default function DashboardPage() {
         body: JSON.stringify({
           email: session?.user?.email,
           sheet_url: config.google_sheet_url,
-          preview_only: true // Add this flag to indicate we only want the preview
+          preview_only: true
         }),
       });
 
@@ -214,10 +215,10 @@ export default function DashboardPage() {
             if (data.type === 'preview') {
               setPreviewData(data.data);
               setShowPreviewDialog(true);
-              return; // Wait for user confirmation
+              return; 
             } else if (data.type === 'status') {
               setEmailStatus(prev => [...prev, data.message]);
-              // Count successful email sends
+              
               if (data.message.includes("✓ Email sent to")) {
                 setEmailsSent(prev => prev + 1);
               }
@@ -282,7 +283,7 @@ export default function DashboardPage() {
             const data = JSON.parse(message);
             if (data.type === 'status') {
               setEmailStatus(prev => [...prev, data.message]);
-              // Count successful email sends
+              
               if (data.message.includes("✓ Email sent to")) {
                 setEmailsSent(prev => prev + 1);
               }
@@ -291,7 +292,7 @@ export default function DashboardPage() {
             }
           } catch (e) {
             console.error('Error parsing message:', e, 'Raw message:', message);
-            // If it's not JSON, treat it as a status message
+            
             setEmailStatus(prev => [...prev, message]);
           }
         }
@@ -306,11 +307,21 @@ export default function DashboardPage() {
     }
   };
 
+  const checkMissingSettings = (config: any) => {
+    const missing: string[] = [];
+    if (!config?.openai_api_key) missing.push("OpenAI API Key");
+    if (!config?.uiform_api_key) missing.push("UiForm API Key");
+    if (!config?.google_sheet_url) missing.push("Google Sheet URL");
+    if (!config?.smtp_user || !config?.smtp_pass || !config?.smtp_server || !config?.smtp_port) {
+      missing.push("Email Settings");
+    }
+    setMissingSettings(missing);
+  };
+
   useEffect(() => {
     if (status === "unauthenticated") router.push("/");
   }, [status, router]);
 
-  // Fetch user config when component loads
   useEffect(() => {
     const fetchConfig = async () => {
       if (session?.user?.email) {
@@ -319,6 +330,7 @@ export default function DashboardPage() {
           if (response.ok) {
             const data = await response.json();
             setConfig(data);
+            checkMissingSettings(data);
           }
         } catch (error) {
           console.error("Error fetching config:", error);
@@ -337,6 +349,41 @@ export default function DashboardPage() {
       <div className="flex-1 overflow-y-auto px-6 py-8 flex justify-center">
         <div className="w-full max-w-4xl space-y-8">
           <h1 className="text-2xl font-semibold">⌟ Dashboard</h1>
+
+          {missingSettings.length > 0 && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <div className="bg-blue-100 p-1 rounded-full">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-600">
+                    <circle cx="12" cy="12" r="10" />
+                    <path d="M12 16v-4" />
+                    <path d="M12 8h.01" />
+                  </svg>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-sm text-blue-700 font-medium">Configuration Required</p>
+                  <p className="text-sm text-blue-600">
+                    Please configure the following settings to use all features:
+                  </p>
+                  <ul className="text-sm text-blue-600 list-disc list-inside">
+                    {missingSettings.map((setting, index) => (
+                      <li key={index}>{setting}</li>
+                    ))}
+                  </ul>
+                  <a
+                    href="/settings"
+                    className="inline-flex items-center text-sm text-blue-600 hover:text-blue-800 hover:underline transition-colors"
+                  >
+                    Go to Settings
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="ml-1">
+                      <path d="M5 12h14" />
+                      <path d="m12 5 7 7-7 7" />
+                    </svg>
+                  </a>
+                </div>
+              </div>
+            </div>
+          )}
 
           <Card>
             <CardContent className="p-6">
@@ -383,8 +430,11 @@ export default function DashboardPage() {
           <Card>
             <CardContent className="p-6 space-y-4">
               <div className="flex items-center justify-between">
-                <div>
+                <div className="flex items-center gap-2">
                   <h2 className="text-lg font-semibold">Bucker Folder</h2>
+                  {isFolderValidated && (
+                    <span className="text-green-500">✓</span>
+                  )}
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="text-sm text-gray-600">Automatically process PNG files from your selected folder:</span>
@@ -517,6 +567,12 @@ export default function DashboardPage() {
               </div>
             </CardContent>
           </Card>
+
+          <section className="bg-white border border-0 rounded-xl p-6 space-y-4">
+            <h2 className="text-lg "></h2>
+            <div className="space-y-4">
+            </div>
+          </section>
         </div>
       </div>
 

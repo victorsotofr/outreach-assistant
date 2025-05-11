@@ -232,7 +232,7 @@ export default function TemplatesPage() {
                     Use these placeholders in your templates to personalize your emails:
                   </p>
                   <div className="grid grid-cols-2 gap-2 text-sm text-blue-700">
-                    <div><code className="bg-blue-100 px-2 py-1 rounded">[CIVILITY]</code> - Formal/informal addressing</div>
+                    <div><code className="bg-blue-100 px-2 py-1 rounded">[CIVILITY]</code> - Formal/Informal addressing</div>
                     <div><code className="bg-blue-100 px-2 py-1 rounded">[LAST_NAME]</code> - Recipient's last name</div>
                     <div><code className="bg-blue-100 px-2 py-1 rounded">[COMPANY]</code> - Company name</div>
                     <div><code className="bg-blue-100 px-2 py-1 rounded">[SCHOOL]</code> - School name</div>
@@ -362,6 +362,12 @@ export default function TemplatesPage() {
               </div>
             )}
           </div>
+
+          <section className="bg-white border border-0 rounded-xl p-6 space-y-4">
+            <h2 className="text-lg "></h2>
+            <div className="space-y-4">
+            </div>
+          </section>
         </div>
       </div>
     </main>
