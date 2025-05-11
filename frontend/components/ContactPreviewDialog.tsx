@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useState } from 'react';
 
 interface ContactPreviewDialogProps {
   data: any[];
@@ -15,13 +15,12 @@ const ContactPreviewDialog: React.FC<ContactPreviewDialogProps> = ({
 }) => {
   const [isSending, setIsSending] = useState(false);
   const [showStreamingDialog, setShowStreamingDialog] = useState(false);
-  const [statusMessages, setStatusMessages] = useState<string[]>([]);
-  const statusContainerRef = useRef<HTMLDivElement>(null);
+  const [isComplete, setIsComplete] = useState(false);
 
   const handleConfirm = async () => {
     setIsSending(true);
     setShowStreamingDialog(true);
-    setStatusMessages([]);
+    setIsComplete(false);
 
     try {
       const response = await fetch("http://localhost:8000/send-emails", {
@@ -36,62 +35,20 @@ const ContactPreviewDialog: React.FC<ContactPreviewDialogProps> = ({
 
       if (!response.ok) throw new Error("Failed to send emails");
 
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-      if (!reader) throw new Error("No response body");
-
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value);
-        const lines = chunk.split("\n").filter(Boolean);
-
-        for (const line of lines) {
-          try {
-            const cleanLine = line.replace(/^data: /, "").trim();
-            if (!cleanLine) continue;
-            
-            // Handle both JSON and plain text messages
-            let message;
-            try {
-              const parsed = JSON.parse(cleanLine);
-              message = parsed.message;
-            } catch {
-              // If not JSON, use the line as is
-              message = cleanLine;
-            }
-
-            if (message) {
-              setStatusMessages(prev => [...prev, message]);
-              // Auto-scroll to bottom
-              if (statusContainerRef.current) {
-                statusContainerRef.current.scrollTop = statusContainerRef.current.scrollHeight;
-              }
-            }
-          } catch (e) {
-            console.warn("Stream parse error:", line);
-          }
-        }
-      }
-
-      setStatusMessages(prev => [...prev, "✓ All emails sent successfully"]);
+      // Wait for the response to complete
+      await response.text();
+      
+      setIsComplete(true);
       setTimeout(() => {
         setShowStreamingDialog(false);
         onClose();
       }, 2500);
     } catch (error: any) {
-      setStatusMessages(prev => [...prev, `❌ Error: ${error.message}`]);
+      console.error("Error sending emails:", error);
     } finally {
       setIsSending(false);
     }
   };
-
-  useEffect(() => {
-    if (isSending && statusContainerRef.current) {
-      statusContainerRef.current.scrollTop = statusContainerRef.current.scrollHeight;
-    }
-  }, [statusMessages, isSending]);
 
   return (
     <>
@@ -169,19 +126,10 @@ const ContactPreviewDialog: React.FC<ContactPreviewDialogProps> = ({
               )}
             </div>
 
-            <div
-              ref={statusContainerRef}
-              className="bg-gray-50 rounded-lg p-4 max-h-[50vh] overflow-y-auto"
-            >
-              <div className="space-y-1">
-                {statusMessages.length === 0 ? (
-                  <p className="text-sm text-gray-500 italic">Sending emails...</p>
-                ) : (
-                  statusMessages.map((msg, idx) => (
-                    <p key={idx} className="text-sm text-gray-600">{msg}</p>
-                  ))
-                )}
-              </div>
+            <div className="bg-gray-50 rounded-lg p-4">
+              <p className="text-sm text-gray-600">
+                {isComplete ? "✓ All emails sent successfully" : "Sending emails..."}
+              </p>
             </div>
           </div>
         </div>
