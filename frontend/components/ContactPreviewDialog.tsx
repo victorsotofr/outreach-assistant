@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
+import { Button } from "@/components/ui/button";
 
 interface ContactPreviewDialogProps {
   data: any[];
   onClose: () => void;
   email: string;
   sheetUrl: string;
+  onEmailsSent: (count: number) => void;
 }
 
 const ContactPreviewDialog: React.FC<ContactPreviewDialogProps> = ({
@@ -12,6 +14,7 @@ const ContactPreviewDialog: React.FC<ContactPreviewDialogProps> = ({
   onClose,
   email,
   sheetUrl,
+  onEmailsSent,
 }) => {
   const [isSending, setIsSending] = useState(false);
   const [showStreamingDialog, setShowStreamingDialog] = useState(false);
@@ -39,6 +42,8 @@ const ContactPreviewDialog: React.FC<ContactPreviewDialogProps> = ({
       await response.text();
       
       setIsComplete(true);
+      // Update the email count in the dashboard
+      onEmailsSent(data.length);
       setTimeout(() => {
         setShowStreamingDialog(false);
         onClose();
@@ -58,18 +63,20 @@ const ContactPreviewDialog: React.FC<ContactPreviewDialogProps> = ({
             <h3 className="text-lg font-semibold">Review Contacts Before Sending</h3>
             {!isSending && (
               <div className="flex gap-4">
-                <button
+                <Button
                   onClick={onClose}
+                  variant="outline"
                   className="w-12 h-12 flex items-center justify-center bg-red-50 hover:bg-red-100 border-2 border-red-500 rounded-lg transition-colors"
                 >
                   <span className="text-2xl text-red-600">✕</span>
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={handleConfirm}
+                  variant="outline"
                   className="w-12 h-12 flex items-center justify-center bg-green-50 hover:bg-green-100 border-2 border-green-500 rounded-lg transition-colors"
                 >
                   <span className="text-2xl text-green-600">➣</span>
-                </button>
+                </Button>
               </div>
             )}
           </div>
@@ -111,18 +118,19 @@ const ContactPreviewDialog: React.FC<ContactPreviewDialogProps> = ({
           <div className="bg-white rounded-lg p-6 max-w-2xl w-full shadow-xl">
             <div className="flex justify-between items-center mb-4">
               <div className="flex items-center gap-3">
-                <h3 className="text-lg font-semibold">Email Status</h3>
+                <h3 className="text-lg font-semibold">Please Wait</h3>
                 {isSending && (
                   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>
                 )}
               </div>
               {!isSending && (
-                <button
+                <Button
                   onClick={() => setShowStreamingDialog(false)}
+                  variant="outline"
                   className="w-12 h-12 flex items-center justify-center bg-red-50 hover:bg-red-100 border-2 border-red-500 rounded-lg transition-colors"
                 >
                   <span className="text-2xl text-red-600">✕</span>
-                </button>
+                </Button>
               )}
             </div>
 

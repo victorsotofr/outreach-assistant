@@ -50,6 +50,19 @@ export default function DashboardPage() {
   const [isFolderValidated, setIsFolderValidated] = useState(false);
   const [statusMessages, setStatusMessages] = useState<string[]>([]);
 
+  // Load persisted values from localStorage on component mount
+  useEffect(() => {
+    const storedEmailsSent = localStorage.getItem('emailsSent');
+    if (storedEmailsSent) {
+      setEmailsSent(parseInt(storedEmailsSent, 10));
+    }
+  }, []);
+
+  // Update localStorage when emailsSent changes
+  useEffect(() => {
+    localStorage.setItem('emailsSent', emailsSent.toString());
+  }, [emailsSent]);
+
   const toggleWatcher = async (checked: boolean) => {
     const endpoint = checked ? "/watcher/start" : "/watcher/stop";
     const payload = {
@@ -302,6 +315,13 @@ export default function DashboardPage() {
     fetchConfig();
   }, [session?.user?.email]);
 
+  // Fetch contacts count when config changes
+  useEffect(() => {
+    if (config?.google_sheet_url) {
+      fetchTotalContacts();
+    }
+  }, [config?.google_sheet_url]);
+
   if (status === "loading") return <div>Loading...</div>;
   if (!session) return null;
 
@@ -381,7 +401,7 @@ export default function DashboardPage() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                     </svg>
                   </div>
-                  <span className="text-sm text-gray-600">Emails</span>
+                  <span className="text-sm text-gray-600">Emails Sent</span>
                   <span className="text-lg font-semibold text-purple-600">{emailsSent}</span>
                 </div>
               </div>
@@ -519,6 +539,9 @@ export default function DashboardPage() {
           onClose={() => setShowPreviewDialog(false)}
           email={session?.user?.email || ''}
           sheetUrl={config?.google_sheet_url || ''}
+          onEmailsSent={(count) => {
+            setEmailsSent(prev => prev + count);
+          }}
         />
       )}
 
