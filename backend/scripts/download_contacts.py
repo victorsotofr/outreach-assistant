@@ -4,6 +4,7 @@ import requests
 from datetime import datetime
 import sys
 import re
+import io
 
 # === Load environment and paths ===
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -38,18 +39,14 @@ def download_and_clean_sheet(sheet_url=None, confirm=True):
     response = requests.get(csv_url, timeout=10)
     response.raise_for_status()
 
-    # Read directly from the response content
-    df = pd.read_csv(pd.io.common.StringIO(response.text))
+    df = pd.read_csv(io.BytesIO(response.content), encoding="utf-8")
 
     missing = [col for col in COLUMNS_TO_KEEP if col not in df.columns]
     if missing:
         print(f"❌ Missing columns in sheet: {missing}")
         return
 
-    df = df[COLUMNS_TO_KEEP]
-    
-    # Save to Downloads folder as Excel
-    df.to_excel(DOWNLOADS_PATH, index=False, engine='openpyxl')
+    df[COLUMNS_TO_KEEP].to_excel(DOWNLOADS_PATH, index=False, engine='openpyxl')
     print(f"✓ Saved contact list to Downloads: {DOWNLOADS_PATH}")
 
 def get_sheet_preview(sheet_url, rows=5):
@@ -58,9 +55,7 @@ def get_sheet_preview(sheet_url, rows=5):
         csv_url = get_sheet_csv_url(sheet_url)
         response = requests.get(csv_url, timeout=10)
         response.raise_for_status()
-        
-        # Read CSV with proper encoding
-        df = pd.read_csv(pd.io.common.StringIO(response.text), encoding='utf-8')
+        df = pd.read_csv(io.StringIO(response.content.decode('utf-8')))
         return df.head(rows).to_dict('records')
     except Exception as e:
         print(f"Error getting sheet preview: {e}")

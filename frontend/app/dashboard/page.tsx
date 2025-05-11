@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { FolderOpen } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
-import { EyeIcon, EyeSlashIcon, ArrowDownTrayIcon, PaperAirplaneIcon } from "@heroicons/react/24/outline";
+import { ArrowDownTrayIcon, PaperAirplaneIcon } from "@heroicons/react/24/outline";
 import ContactPreviewDialog from "@/components/ContactPreviewDialog";
 
 interface Session {
@@ -48,6 +48,7 @@ export default function DashboardPage() {
   const [emailsSent, setEmailsSent] = useState(0);
   const [missingSettings, setMissingSettings] = useState<string[]>([]);
   const [isFolderValidated, setIsFolderValidated] = useState(false);
+  const [statusMessages, setStatusMessages] = useState<string[]>([]);
 
   const toggleWatcher = async (checked: boolean) => {
     const endpoint = checked ? "/watcher/start" : "/watcher/stop";
@@ -143,34 +144,14 @@ export default function DashboardPage() {
       const data = await response.json();
       toast.success('Contact list downloaded successfully');
       
-      // Refresh the contact preview
-      await fetchSheetPreview();
+      // Update the contacts count after successful download
+      fetchTotalContacts();
       
     } catch (error) {
       console.error('Download error:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to download contact list');
     } finally {
       setIsDownloading(false);
-    }
-  };
-
-  const fetchSheetPreview = async () => {
-    if (!config?.google_sheet_url) return;
-    
-    setIsLoadingPreview(true);
-    try {
-      const previewResponse = await fetch(`http://localhost:8000/sheet-preview?url=${encodeURIComponent(config.google_sheet_url)}`);
-      if (previewResponse.ok) {
-        const previewData = await previewResponse.json();
-        setContactPreview(previewData || []);
-      } else {
-        const errorText = await previewResponse.text();
-        console.error('Preview error:', errorText);
-      }
-    } catch (error) {
-      console.error('Failed to fetch preview:', error);
-    } finally {
-      setIsLoadingPreview(false);
     }
   };
 
@@ -184,9 +165,8 @@ export default function DashboardPage() {
       setIsSending(true);
       setEmailStatus([]);
 
-      // First, get the preview
       const previewResponse = await fetch(`http://localhost:8000/sheet-preview?url=${encodeURIComponent(config.google_sheet_url)}`);
-      
+
       if (!previewResponse.ok) {
         const errorText = await previewResponse.text();
         let errorMessage;
@@ -206,7 +186,6 @@ export default function DashboardPage() {
 
       setPreviewData(previewData);
       setShowPreviewDialog(true);
-
     } catch (error) {
       console.error("Error getting preview:", error);
       toast.error(error instanceof Error ? error.message : "Failed to get preview");
@@ -215,67 +194,59 @@ export default function DashboardPage() {
     }
   };
 
-  const handleConfirmSend = async () => {
-    setShowPreviewDialog(false);
-    
+  const streamEmailSending = async () => {
     try {
-      setIsSending(true);
-      setEmailStatus([]);
-
       const response = await fetch("http://localhost:8000/send-emails", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: session?.user?.email,
           sheet_url: config?.google_sheet_url,
-          confirmed: true
+          confirmed: true,
         }),
       });
 
-      if (!response.ok) {
-        throw new Error("Failed to send emails");
-      }
+      if (!response.ok) throw new Error("Failed to send emails");
 
       const reader = response.body?.getReader();
-      if (!reader) throw new Error("No response stream available");
+      const decoder = new TextDecoder();
+      if (!reader) throw new Error("No response stream");
 
       while (true) {
-        const { done, value } = await reader.read();
+        const { value, done } = await reader.read();
         if (done) break;
 
-        const text = new TextDecoder().decode(value);
-        const messages = text.split('\n').filter(Boolean);
+        const chunk = decoder.decode(value);
+        const lines = chunk.split("\n").filter(Boolean);
 
-        for (const message of messages) {
-          if (!message.trim()) continue;
-          
+        for (const line of lines) {
           try {
-            const jsonStr = message.startsWith('data: ') ? message.slice(6) : message;
-            const data = JSON.parse(jsonStr);
+            const cleanLine = line.replace(/^data: /, "").trim();
+            if (!cleanLine) continue;
             
-            if (data.type === 'status') {
-              setEmailStatus(prev => [...prev, data.message]);
-              if (data.message.includes("✓ Email sent to")) {
+            // Handle both JSON and plain text messages
+            let message;
+            try {
+              const parsed = JSON.parse(cleanLine);
+              message = parsed.message;
+            } catch {
+              // If not JSON, use the line as is
+              message = cleanLine;
+            }
+
+            if (message) {
+              setEmailStatus(prev => [...prev, message]);
+              if (message.includes("✓ Email sent to")) {
                 setEmailsSent(prev => prev + 1);
               }
-            } else if (data.type === 'error') {
-              throw new Error(data.message);
             }
           } catch (e) {
-            console.error('Error parsing message:', e, 'Raw message:', message);
-            setEmailStatus(prev => [...prev, message]);
+            console.warn("Stream parse error:", line);
           }
         }
       }
-
-      toast.success("Emails sent successfully");
-    } catch (error) {
-      console.error("Error sending emails:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to send emails");
-    } finally {
-      setIsSending(false);
+    } catch (err) {
+      toast.error("Streaming error during email send");
     }
   };
 
@@ -288,6 +259,20 @@ export default function DashboardPage() {
       missing.push("Email Settings");
     }
     setMissingSettings(missing);
+  };
+
+  const fetchTotalContacts = async () => {
+    if (!config?.google_sheet_url) return;
+    
+    try {
+      const response = await fetch(`http://localhost:8000/sheet-preview?url=${encodeURIComponent(config.google_sheet_url)}&rows=1000`);
+      if (response.ok) {
+        const data = await response.json();
+        setContactsProcessed(data.length);
+      }
+    } catch (error) {
+      console.error('Failed to fetch total contacts:', error);
+    }
   };
 
   useEffect(() => {
@@ -303,6 +288,10 @@ export default function DashboardPage() {
             const data = await response.json();
             setConfig(data);
             checkMissingSettings(data);
+            // Fetch total contacts when config is loaded
+            if (data.google_sheet_url) {
+              fetchTotalContacts();
+            }
           }
         } catch (error) {
           console.error("Error fetching config:", error);
@@ -368,7 +357,7 @@ export default function DashboardPage() {
                       isWatching ? 'bg-green-500 animate-pulse' : 'bg-gray-400'
                     }`} />
                   </div>
-                  <span className="text-sm text-gray-600">Status</span>
+                  <span className="text-sm text-gray-600">Processing Status</span>
                   <span className={`text-lg font-semibold ${
                     isWatching ? 'text-green-600' : 'text-gray-600'
                   }`}>
@@ -382,7 +371,7 @@ export default function DashboardPage() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                     </svg>
                   </div>
-                  <span className="text-sm text-gray-600">Contacts</span>
+                  <span className="text-sm text-gray-600">Contacts in Active Sheet</span>
                   <span className="text-lg font-semibold text-blue-600">{contactsProcessed}</span>
                 </div>
 
@@ -409,7 +398,7 @@ export default function DashboardPage() {
                   )}
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="text-sm text-gray-600">Automatically process PNG files from your selected folder:</span>
+                  <span className="text-sm text-gray-600">Process PNG files from your Selected Bucket Folder:</span>
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-gray-500">Off</span>
                     <Switch
@@ -487,26 +476,7 @@ export default function DashboardPage() {
 
           <Card>
             <CardContent className="p-6">
-              <div className="grid grid-cols-3 gap-4">
-                <button
-                  onClick={() => toggleWatcher(!isWatching)}
-                  disabled={isWatching && !watcherSessionId}
-                  className={`flex flex-col items-center justify-center p-6 rounded-xl transition-all duration-200 ${
-                    isWatching
-                      ? 'bg-green-50 border-2 border-green-500'
-                      : 'bg-white border-2 border-gray-200 hover:border-gray-300'
-                  }`}
-                >
-                  {isWatching ? (
-                    <EyeIcon className="h-12 w-12 mb-2 text-green-600" />
-                  ) : (
-                    <EyeSlashIcon className="h-12 w-12 mb-2 text-gray-600" />
-                  )}
-                  <span className={`text-lg font-medium ${isWatching ? 'text-green-600' : 'text-gray-900'}`}>
-                    Watch
-                  </span>
-                </button>
-
+              <div className="grid grid-cols-2 gap-4">
                 <button
                   onClick={handleDownload}
                   disabled={isDownloading || !config?.google_sheet_url || isWatching}
@@ -547,7 +517,8 @@ export default function DashboardPage() {
         <ContactPreviewDialog
           data={previewData}
           onClose={() => setShowPreviewDialog(false)}
-          onConfirm={handleConfirmSend}
+          email={session?.user?.email || ''}
+          sheetUrl={config?.google_sheet_url || ''}
         />
       )}
 

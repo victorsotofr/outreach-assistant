@@ -246,7 +246,7 @@ def sheet_preview(url: str, rows: int = 5):
         from scripts.download_contacts import get_sheet_preview
 
         preview_data = get_sheet_preview(url, rows)
-        # Convert NaN values to None and fix encoding
+        # Convert NaN values to None for JSON serialization
         cleaned_data = []
         for row in preview_data:
             cleaned_row = {}
@@ -254,12 +254,7 @@ def sheet_preview(url: str, rows: int = 5):
                 if pd.isna(v):
                     cleaned_row[k] = None
                 elif isinstance(v, str):
-                    # Fix encoding issues
-                    try:
-                        # Try to decode if it's already encoded
-                        cleaned_row[k] = v.encode('latin1').decode('utf-8')
-                    except:
-                        cleaned_row[k] = v
+                    cleaned_row[k] = v
                 else:
                     cleaned_row[k] = v
             cleaned_data.append(cleaned_row)
@@ -295,7 +290,6 @@ async def send_emails(request: Request):
                         message = {k: (None if pd.isna(v) else v) for k, v in message.items()}
                     # Ensure we're sending a proper JSON string
                     json_message = json.dumps(message)
-                    print(f"Sending message: {json_message}")  # Debug log
                     yield f"data: {json_message}\n\n"
             except Exception as e:
                 error_message = {"error": True, "message": str(e)}

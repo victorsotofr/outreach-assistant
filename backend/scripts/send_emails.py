@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from openai import OpenAI
+import io
 
 # === PATH SETUP ===
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -70,7 +71,7 @@ def get_sheet_data(sheet_url):
     csv_url = get_sheet_csv_url(sheet_url)
     response = requests.get(csv_url, timeout=10)
     response.raise_for_status()
-    return pd.read_csv(pd.io.common.StringIO(response.text))
+    return pd.read_csv(io.BytesIO(response.content), encoding="utf-8")
 
 def enrich_contact(contact):
     prompt = f"""

@@ -3,6 +3,7 @@ import sys
 import requests
 from dotenv import load_dotenv
 import time
+import subprocess
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, ".."))
@@ -13,6 +14,33 @@ load_dotenv(os.path.join(PROJECT_ROOT, ".env"))
 
 UIFORM_API_ENDPOINT = os.getenv("UIFORM_API_ENDPOINT")
 UIFORM_API_KEY = os.getenv("UIFORM_API_KEY")
+
+def notify(title, message):
+    """Send a macOS notification."""
+    print(f"Attempting to send notification - Title: {title}, Message: {message}")
+    try:
+        # Escape double quotes in the message and title
+        escaped_title = title.replace('"', '\\"')
+        escaped_message = message.replace('"', '\\"')
+        
+        # Create the AppleScript command
+        script = f'display notification "{escaped_message}" with title "{escaped_title}"'
+        print(f"Executing AppleScript: {script}")
+        
+        result = subprocess.run(
+            ['osascript', '-e', script],
+            capture_output=True,
+            text=True
+        )
+        
+        if result.returncode != 0:
+            print(f"Notification failed with error: {result.stderr}")
+        else:
+            print("Notification sent successfully")
+            
+    except Exception as e:
+        print(f"Warning: Could not send notification: {str(e)}")
+        print(f"Error type: {type(e).__name__}")
 
 def process_file(file_path):
     """Process a file by uploading it to UiForm API."""
