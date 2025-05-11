@@ -4,11 +4,11 @@ import path from 'path';
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { name: string } }
+  context: { params: { name: string } }
 ) {
   try {
     const templatesDir = path.join(process.cwd(), '..', 'backend', 'templates');
-    const filePath = path.join(templatesDir, params.name);
+    const filePath = path.join(templatesDir, context.params.name);
 
     if (!fs.existsSync(filePath)) {
       return NextResponse.json(
@@ -27,4 +27,4 @@ export async function DELETE(
       { status: 500 }
     );
   }
-} 
+}
