@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { FolderOpen } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { EyeIcon, EyeSlashIcon, ArrowDownTrayIcon, PaperAirplaneIcon } from "@heroicons/react/24/outline";
+import ContactPreviewDialog from "@/components/ContactPreviewDialog";
 
 interface Session {
   user?: {
@@ -20,7 +21,7 @@ interface Session {
 }
 
 interface UserSettings {
-  googleSheetUrl?: string;
+  google_sheet_url?: string;
   openai_api_key?: string;
   uiform_api_key?: string;
   smtp_pass?: string;
@@ -87,7 +88,6 @@ export default function DashboardPage() {
     } catch (err) {
       console.error("Watcher error:", err);
       toast.error(err instanceof Error ? err.message : "Failed to toggle watcher");
-      // Revert the switch state if there was an error
       setIsWatching(!checked);
     }
   };
@@ -120,14 +120,8 @@ export default function DashboardPage() {
   const handleDownload = async () => {
     setIsDownloading(true);
     try {
-      const configResponse = await fetch(`http://localhost:8000/config?email=${session?.user?.email}`);
-      if (!configResponse.ok) {
-        throw new Error('Failed to fetch configuration');
-      }
-      const config = await configResponse.json();
-
-      if (!config.google_sheet_url) {
-        throw new Error('Google Sheet URL not configured');
+      if (!config?.google_sheet_url) {
+        throw new Error('Google Sheet URL not configured in settings');
       }
 
       const response = await fetch('http://localhost:8000/download-contacts', {
@@ -150,25 +144,33 @@ export default function DashboardPage() {
       toast.success('Contact list downloaded successfully');
       
       // Refresh the contact preview
-      if (config.google_sheet_url) {
-        setIsLoadingPreview(true);
-        try {
-          const previewResponse = await fetch(`http://localhost:8000/sheet-preview?url=${encodeURIComponent(config.google_sheet_url)}`);
-          if (previewResponse.ok) {
-            const previewData = await previewResponse.json();
-            setContactPreview(previewData || []);
-          }
-        } catch (error) {
-          console.error('Failed to refresh preview:', error);
-        } finally {
-          setIsLoadingPreview(false);
-        }
-      }
+      await fetchSheetPreview();
+      
     } catch (error) {
       console.error('Download error:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to download contact list');
     } finally {
       setIsDownloading(false);
+    }
+  };
+
+  const fetchSheetPreview = async () => {
+    if (!config?.google_sheet_url) return;
+    
+    setIsLoadingPreview(true);
+    try {
+      const previewResponse = await fetch(`http://localhost:8000/sheet-preview?url=${encodeURIComponent(config.google_sheet_url)}`);
+      if (previewResponse.ok) {
+        const previewData = await previewResponse.json();
+        setContactPreview(previewData || []);
+      } else {
+        const errorText = await previewResponse.text();
+        console.error('Preview error:', errorText);
+      }
+    } catch (error) {
+      console.error('Failed to fetch preview:', error);
+    } finally {
+      setIsLoadingPreview(false);
     }
   };
 
@@ -180,56 +182,31 @@ export default function DashboardPage() {
 
     try {
       setIsSending(true);
-      setEmailStatus([]); // Clear previous status
+      setEmailStatus([]);
 
-      const response = await fetch("http://localhost:8000/send-emails", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email: session?.user?.email,
-          sheet_url: config.google_sheet_url,
-          preview_only: true
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || "Failed to get preview");
-      }
-
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error("No response stream available");
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const text = new TextDecoder().decode(value);
-        const messages = text.split('\n').filter(Boolean);
-
-        for (const message of messages) {
-          try {
-            const data = JSON.parse(message);
-            if (data.type === 'preview') {
-              setPreviewData(data.data);
-              setShowPreviewDialog(true);
-              return; 
-            } else if (data.type === 'status') {
-              setEmailStatus(prev => [...prev, data.message]);
-              
-              if (data.message.includes("✓ Email sent to")) {
-                setEmailsSent(prev => prev + 1);
-              }
-            } else if (data.type === 'error') {
-              throw new Error(data.message);
-            }
-          } catch (e) {
-            console.error('Error parsing message:', e);
-          }
+      // First, get the preview
+      const previewResponse = await fetch(`http://localhost:8000/sheet-preview?url=${encodeURIComponent(config.google_sheet_url)}`);
+      
+      if (!previewResponse.ok) {
+        const errorText = await previewResponse.text();
+        let errorMessage;
+        try {
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData.detail || "Failed to get preview";
+        } catch {
+          errorMessage = errorText || "Failed to get preview";
         }
+        throw new Error(errorMessage);
       }
+
+      const previewData = await previewResponse.json();
+      if (!Array.isArray(previewData) || previewData.length === 0) {
+        throw new Error("No data found in the Google Sheet");
+      }
+
+      setPreviewData(previewData);
+      setShowPreviewDialog(true);
+
     } catch (error) {
       console.error("Error getting preview:", error);
       toast.error(error instanceof Error ? error.message : "Failed to get preview");
@@ -240,8 +217,11 @@ export default function DashboardPage() {
 
   const handleConfirmSend = async () => {
     setShowPreviewDialog(false);
+    
     try {
       setIsSending(true);
+      setEmailStatus([]);
+
       const response = await fetch("http://localhost:8000/send-emails", {
         method: "POST",
         headers: {
@@ -255,15 +235,7 @@ export default function DashboardPage() {
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
-        let errorMessage;
-        try {
-          const errorData = JSON.parse(errorText);
-          errorMessage = errorData.detail || "Failed to send emails";
-        } catch {
-          errorMessage = errorText || "Failed to send emails";
-        }
-        throw new Error(errorMessage);
+        throw new Error("Failed to send emails");
       }
 
       const reader = response.body?.getReader();
@@ -280,10 +252,11 @@ export default function DashboardPage() {
           if (!message.trim()) continue;
           
           try {
-            const data = JSON.parse(message);
+            const jsonStr = message.startsWith('data: ') ? message.slice(6) : message;
+            const data = JSON.parse(jsonStr);
+            
             if (data.type === 'status') {
               setEmailStatus(prev => [...prev, data.message]);
-              
               if (data.message.includes("✓ Email sent to")) {
                 setEmailsSent(prev => prev + 1);
               }
@@ -292,7 +265,6 @@ export default function DashboardPage() {
             }
           } catch (e) {
             console.error('Error parsing message:', e, 'Raw message:', message);
-            
             setEmailStatus(prev => [...prev, message]);
           }
         }
@@ -567,62 +539,19 @@ export default function DashboardPage() {
               </div>
             </CardContent>
           </Card>
-
-          <section className="bg-white border border-0 rounded-xl p-6 space-y-4">
-            <h2 className="text-lg "></h2>
-            <div className="space-y-4">
-            </div>
-          </section>
         </div>
       </div>
 
       {/* Preview Dialog */}
       {showPreviewDialog && (
-        <div className="fixed inset-0 backdrop-blur-sm bg-white/30 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg p-6 max-w-4xl w-full shadow-xl">
-            <h3 className="text-lg font-semibold mb-4">Review Contacts Before Sending</h3>
-            <div className="max-h-[70vh] overflow-y-auto mb-4">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50 sticky top-0">
-                  <tr>
-                    {previewData[0] && Object.keys(previewData[0]).map((header) => (
-                      <th key={header} className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        {header}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {previewData.map((row, idx) => (
-                    <tr key={idx} className="hover:bg-gray-50">
-                      {Object.values(row).map((value: any, cellIdx) => (
-                        <td key={cellIdx} className="px-4 py-2 text-sm text-gray-900 whitespace-nowrap">
-                          {value}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div className="flex justify-end gap-4">
-              <button
-                onClick={() => setShowPreviewDialog(false)}
-                className="w-12 h-12 flex items-center justify-center bg-red-50 hover:bg-red-100 border-2 border-red-500 rounded-lg transition-colors"
-              >
-                <span className="text-2xl text-red-600">✕</span>
-              </button>
-              <button
-                onClick={handleConfirmSend}
-                className="w-12 h-12 flex items-center justify-center bg-green-50 hover:bg-green-100 border-2 border-green-500 rounded-lg transition-colors"
-              >
-                <span className="text-2xl text-green-600">➣</span>
-              </button>
-            </div>
-          </div>
-        </div>
+        <ContactPreviewDialog
+          data={previewData}
+          onClose={() => setShowPreviewDialog(false)}
+          onConfirm={handleConfirmSend}
+        />
       )}
 
+      {/* Email Status */}
       {emailStatus.length > 0 && (
         <div className="fixed bottom-4 right-4 bg-white rounded-lg shadow-lg p-4 max-w-md max-h-96 overflow-y-auto">
           <h4 className="font-semibold mb-2">Email Status</h4>

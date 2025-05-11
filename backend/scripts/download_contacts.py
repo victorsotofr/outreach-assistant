@@ -59,7 +59,8 @@ def get_sheet_preview(sheet_url, rows=5):
         response = requests.get(csv_url, timeout=10)
         response.raise_for_status()
         
-        df = pd.read_csv(pd.io.common.StringIO(response.text))
+        # Read CSV with proper encoding
+        df = pd.read_csv(pd.io.common.StringIO(response.text), encoding='utf-8')
         return df.head(rows).to_dict('records')
     except Exception as e:
         print(f"Error getting sheet preview: {e}")

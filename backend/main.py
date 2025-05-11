@@ -7,8 +7,11 @@ from fastapi import FastAPI, Request, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from db.config_db import save_user_config, get_user_config, get_user_templates, save_template, delete_template, update_template
 from fastapi.responses import StreamingResponse
+import shutil
+from datetime import datetime
+import pandas as pd
+import json
 
-# === Setup ===
 app = FastAPI()
 
 app.add_middleware(
@@ -33,7 +36,6 @@ async def post_config(request: Request):
 async def fetch_config(email: str):
     return get_user_config(email)
 
-# Template endpoints
 @app.get("/templates")
 async def fetch_templates(email: str):
     return get_user_templates(email)
@@ -88,7 +90,6 @@ watch_script = os.path.join(SCRIPTS_DIR, "watch_folder.py")
 logs_folder = os.path.join(PROJECT_DIR, "logs")
 output_folder = os.path.join(PROJECT_DIR, "output")
 
-# === Core Functions ===
 def run_script(script_path):
     """Run a script and return its output."""
     result = subprocess.run(
@@ -124,8 +125,6 @@ def send_outreach_emails():
     """Send outreach emails and return status updates."""
     return send_emails.run_from_ui()
 
-# === API Endpoints ===
-# These functions will be used by the frontend to interact with the backend
 def get_folder_paths():
     """Return paths to important folders."""
     return {
@@ -133,7 +132,6 @@ def get_folder_paths():
         "output": output_folder
     }
 
-# Track active watcher process
 active_watcher = None
 
 @app.post("/watcher/start")
@@ -141,16 +139,18 @@ async def start_watcher(request: Request):
     """Start watching the selected folder."""
     global active_watcher
     
-    # Check if watcher is already running
     if active_watcher and active_watcher.is_alive():
         return {"status": "already running"}
     
     data = await request.json()
-    watch_folder = data.get("watchFolder", "/Users/victorsoto/Downloads")
+    watch_folder = data.get("watchFolder")
     email = data.get("email")
     
     if not email:
         raise HTTPException(status_code=400, detail="Email is required")
+    
+    if not watch_folder:
+        raise HTTPException(status_code=400, detail="Please select a folder first")
     
     print(f"Starting watcher for folder: {watch_folder}")
     
@@ -169,6 +169,9 @@ async def stop_watcher():
     try:
         if active_watcher and active_watcher.is_alive():
             active_watcher.terminate()
+            active_watcher.join(timeout=5)
+            if active_watcher.is_alive():
+                active_watcher.kill()
             active_watcher = None
             return {"status": "ok"}
         return {"status": "not running"}
@@ -180,31 +183,38 @@ async def root():
     return {"message": "API is running"}
 
 @app.post("/select-folder")
-async def select_folder():
-    """Open a folder selection dialog and return the selected path."""
-    print("Select folder endpoint called")  # Debug log
-    try:
-        # Simpler AppleScript to open folder picker
-        script = 'choose folder with prompt "Select a folder to watch for screenshots"'
-        print("Executing AppleScript...")
-        result = subprocess.run(['osascript', '-e', script], capture_output=True, text=True)
-        print(f"AppleScript result: {result.stdout}")
-        print(f"AppleScript error: {result.stderr}")
-        
-        if result.returncode == 0 and result.stdout.strip():
-            # Convert Mac path to POSIX path
-            posix_script = f'return POSIX path of "{result.stdout.strip()}"'
-            posix_result = subprocess.run(['osascript', '-e', posix_script], capture_output=True, text=True)
-            selected_path = posix_result.stdout.strip()
-            print(f"Selected path: {selected_path}")
-            return {"folder": selected_path}
-        else:
-            error_msg = result.stderr or "No folder selected"
-            print(f"Error selecting folder: {error_msg}")
-            return {"error": error_msg}
-    except Exception as e:
-        print(f"Exception in select_folder: {str(e)}")
-        return {"error": str(e)}
+def select_folder():
+    """
+    Opens a native macOS 'choose folder' dialog
+    and returns its POSIX path. Raises 400 on cancel/error.
+    """
+    script = 'POSIX path of (choose folder with prompt "Sélectionnez un dossier à surveiller")'
+    result = subprocess.run(
+        ['osascript', '-e', script],
+        capture_output=True, text=True
+    )
+
+    path = result.stdout.strip()
+
+    if result.returncode != 0 or not path:
+        raise HTTPException(status_code=400, detail="No folder selected")
+
+    if path.endswith("/"):
+        path = path[:-1]
+
+    if not os.path.exists(path):
+        raise HTTPException(status_code=400, detail="Selected folder does not exist")
+
+    return {"folder": path}
+
+@app.get("/watcher/status")
+async def get_watcher_status():
+    """Get the current status of the watcher."""
+    global active_watcher
+    return {
+        "is_running": active_watcher is not None and active_watcher.is_alive(),
+        "processed_files": get_processed_files() if active_watcher and active_watcher.is_alive() else []
+    }
 
 @app.post("/download-contacts")
 async def download_contacts(request: Request):
@@ -212,11 +222,21 @@ async def download_contacts(request: Request):
         data = await request.json()
         email = data.get("email")
         sheet_url = data.get("sheet_url")
+        action = data.get("action")
 
         if not email or not sheet_url:
             raise HTTPException(status_code=400, detail="Email and sheet URL are required")
 
-        # Call the download script
+        if active_watcher and active_watcher.is_alive():
+            return {
+                "error": True,
+                "message": "Please stop the watcher before downloading contacts",
+                "type": "watcher_running"
+            }
+
+        if action == "delete":
+            delete_processed_files()
+
         from scripts.download_contacts import download_and_clean_sheet
         download_and_clean_sheet(sheet_url, confirm=False)
         
@@ -225,12 +245,33 @@ async def download_contacts(request: Request):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/sheet-preview")
-async def get_sheet_preview(url: str):
-    """Get a preview of the first 5 rows from the Google Sheet."""
+def sheet_preview(url: str, rows: int = 5):
+    """
+    Retourne les `rows` premières lignes de la Google Sheet en JSON.
+    """
     try:
         from scripts.download_contacts import get_sheet_preview
-        data = get_sheet_preview(url, rows=5)
-        return data
+
+        preview_data = get_sheet_preview(url, rows)
+        # Convert NaN values to None and fix encoding
+        cleaned_data = []
+        for row in preview_data:
+            cleaned_row = {}
+            for k, v in row.items():
+                if pd.isna(v):
+                    cleaned_row[k] = None
+                elif isinstance(v, str):
+                    # Fix encoding issues
+                    try:
+                        # Try to decode if it's already encoded
+                        cleaned_row[k] = v.encode('latin1').decode('utf-8')
+                    except:
+                        cleaned_row[k] = v
+                else:
+                    cleaned_row[k] = v
+            cleaned_data.append(cleaned_row)
+        return cleaned_data
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -241,18 +282,64 @@ async def send_emails(request: Request):
         data = await request.json()
         email = data.get("email")
         sheet_url = data.get("sheet_url")
+        action = data.get("action")
         confirmed = data.get("confirmed", False)
         preview_only = data.get("preview_only", False)
 
         if not email or not sheet_url:
             raise HTTPException(status_code=400, detail="Email and sheet URL are required")
 
+        if active_watcher and active_watcher.is_alive():
+            return {
+                "error": True,
+                "message": "Please stop the watcher before sending emails",
+                "type": "watcher_running"
+            }
+
+        if action == "delete":
+            delete_processed_files()
+
         from scripts.send_emails import run_from_ui
         
         async def generate():
-            for message in run_from_ui(sheet_url, preview_only=preview_only):
-                yield message + "\n"
+            try:
+                for message in run_from_ui(sheet_url, preview_only=preview_only):
+                    # Clean any NaN values from the message
+                    if isinstance(message, dict):
+                        message = {k: (None if pd.isna(v) else v) for k, v in message.items()}
+                    # Ensure we're sending a proper JSON string
+                    json_message = json.dumps(message)
+                    print(f"Sending message: {json_message}")  # Debug log
+                    yield f"data: {json_message}\n\n"
+            except Exception as e:
+                error_message = {"error": True, "message": str(e)}
+                yield f"data: {json.dumps(error_message)}\n\n"
 
-        return StreamingResponse(generate(), media_type="text/event-stream")
+        return StreamingResponse(
+            generate(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no"
+            }
+        )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) 
+        raise HTTPException(status_code=500, detail=str(e))
+
+def get_processed_files():
+    """Get list of processed files."""
+    processed_dir = os.path.join(PROJECT_DIR, "processed")
+    if not os.path.exists(processed_dir):
+        return []
+    return [f for f in os.listdir(processed_dir) if f.endswith('.png')]
+
+def delete_processed_files():
+    """Delete all processed files."""
+    processed_dir = os.path.join(PROJECT_DIR, "processed")
+    if not os.path.exists(processed_dir):
+        return
+        
+    for file in os.listdir(processed_dir):
+        if file.endswith('.png'):
+            os.remove(os.path.join(processed_dir, file)) 
