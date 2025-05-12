@@ -3,15 +3,9 @@ import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 
-type Params = {
-  params: {
-    name: string;
-  };
-};
-
 export async function DELETE(
-  req: NextRequest,
-  { params }: Params
+  request: NextRequest,
+  { params }: { params: { name: string } }
 ) {
   const { name } = params;
 
