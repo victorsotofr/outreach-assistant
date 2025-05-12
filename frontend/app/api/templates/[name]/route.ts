@@ -3,11 +3,17 @@ import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 
+type Params = {
+  params: {
+    name: string;
+  };
+};
+
 export async function DELETE(
   req: NextRequest,
-  context: { params: { name: string } }
+  { params }: Params
 ) {
-  const { name } = context.params;
+  const { name } = params;
 
   try {
     const templatesDir = path.join(process.cwd(), 'backend', 'templates');
