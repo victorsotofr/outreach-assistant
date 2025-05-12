@@ -1,35 +1,25 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-
-type RouteContext = {
-  params: {
-    name: string;
-  };
-};
+import fs from 'fs';
+import path from 'path';
 
 export async function DELETE(
-  request: NextRequest,
-  context: RouteContext
+  req: NextRequest,
+  context: { params: { name: string } }
 ) {
   const { name } = context.params;
-  const email = request.nextUrl.searchParams.get('email');
-
-  if (!email) {
-    return NextResponse.json({ error: 'Email is required' }, { status: 400 });
-  }
 
   try {
-    const response = await fetch(`http://localhost:8000/templates/${name}?email=${encodeURIComponent(email)}`, {
-      method: 'DELETE',
-    });
+    const templatesDir = path.join(process.cwd(), 'backend', 'templates');
+    const filePath = path.join(templatesDir, name);
 
-    if (!response.ok) {
-      const error = await response.json();
-      return NextResponse.json(error, { status: response.status });
+    if (!fs.existsSync(filePath)) {
+      return NextResponse.json({ error: 'Template not found' }, { status: 404 });
     }
 
-    const data = await response.json();
-    return NextResponse.json(data);
+    fs.unlinkSync(filePath);
+
+    return NextResponse.json({ message: 'Template deleted successfully' });
   } catch (error) {
     console.error('Error deleting template:', error);
     return NextResponse.json({ error: 'Failed to delete template' }, { status: 500 });
