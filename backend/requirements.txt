@@ -1,5 +1,10 @@
-fastapi
-uvicorn
-pymongo
-python-dotenv
-cryptography 
+fastapi==0.109.2
+uvicorn==0.27.1
+python-dotenv==1.0.1
+pymongo==4.6.1
+pandas==2.2.0
+openai==1.12.0
+python-multipart==0.0.9
+requests==2.31.0
+watchdog==3.0.0
+cryptography==42.0.2 

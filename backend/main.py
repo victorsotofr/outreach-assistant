@@ -14,9 +14,12 @@ import json
 
 app = FastAPI()
 
+# Get the frontend URL from environment variable or default to localhost
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=[FRONTEND_URL],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -375,4 +378,9 @@ def delete_processed_files():
         
     for file in os.listdir(processed_dir):
         if file.endswith('.png'):
-            os.remove(os.path.join(processed_dir, file)) 
+            os.remove(os.path.join(processed_dir, file))
+
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port) 
