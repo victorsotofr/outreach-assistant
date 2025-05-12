@@ -84,8 +84,40 @@ export default function DashboardPage() {
       });
       
       if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error(errorText);
+        const errorData = await res.json();
+        if (errorData.detail) {
+          // Handle structured error response
+          const { message, code, action } = errorData.detail;
+          let errorMessage = message;
+          
+          // Add action to the error message if available
+          if (action) {
+            errorMessage += `\n${action}`;
+          }
+          
+          // Handle specific error codes
+          switch (code) {
+            case "MISSING_EMAIL":
+              router.push("/"); // Redirect to login
+              break;
+            case "MISSING_FOLDER":
+              // Don't show error if user just needs to select a folder
+              if (checked) {
+                toast.error(errorMessage);
+              }
+              break;
+            case "MISSING_API_CONFIG":
+              router.push("/settings"); // Redirect to settings
+              break;
+            default:
+              toast.error(errorMessage);
+          }
+          
+          throw new Error(errorMessage);
+        } else {
+          // Handle legacy error format
+          throw new Error(errorData.detail || "Failed to toggle watcher");
+        }
       }
       
       const data = await res.json();
@@ -93,15 +125,18 @@ export default function DashboardPage() {
       if (checked) {
         setWatcherSessionId(data.sessionId);
         setIsWatching(true);
-        toast.success("PNG file watcher started");
+        toast.success(data.message || "PNG file watcher started");
       } else {
         setWatcherSessionId(null);
         setIsWatching(false);
-        toast.success("PNG file watcher stopped");
+        toast.success(data.message || "PNG file watcher stopped");
       }
     } catch (err) {
       console.error("Watcher error:", err);
-      toast.error(err instanceof Error ? err.message : "Failed to toggle watcher");
+      // Only show error toast if it's not a handled error (like missing folder)
+      if (!(err instanceof Error && err.message.includes("Please select a folder first"))) {
+        toast.error(err instanceof Error ? err.message : "Failed to toggle watcher");
+      }
       setIsWatching(!checked);
     }
   };
@@ -332,28 +367,28 @@ export default function DashboardPage() {
           <h1 className="text-2xl font-semibold">⌟ Dashboard</h1>
 
           {missingSettings.length > 0 && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
               <div className="flex items-start gap-3">
-                <div className="bg-blue-100 p-1 rounded-full">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-600">
+                <div className="bg-red-100 p-1 rounded-full">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-red-600">
                     <circle cx="12" cy="12" r="10" />
                     <path d="M12 16v-4" />
                     <path d="M12 8h.01" />
                   </svg>
                 </div>
                 <div className="space-y-2">
-                  <p className="text-sm text-blue-700 font-medium">Configuration Required</p>
-                  <p className="text-sm text-blue-600">
+                  <p className="text-sm text-red-700 font-medium">Configuration Required</p>
+                  <p className="text-sm text-red-600">
                     Please configure the following settings to use all features:
                   </p>
-                  <ul className="text-sm text-blue-600 list-disc list-inside">
+                  <ul className="text-sm text-red-600 list-disc list-inside">
                     {missingSettings.map((setting, index) => (
                       <li key={index}>{setting}</li>
                     ))}
                   </ul>
                   <a
                     href="/settings"
-                    className="inline-flex items-center text-sm text-blue-600 hover:text-blue-800 hover:underline transition-colors"
+                    className="inline-flex items-center text-sm text-red-600 hover:text-red-800 hover:underline transition-colors"
                   >
                     Go to Settings
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="ml-1">

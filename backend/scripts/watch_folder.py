@@ -34,11 +34,22 @@ LOG_DIR = os.path.join(PROJECT_ROOT, "logs")
 os.makedirs(LOG_DIR, exist_ok=True)
 LOG_FILE = os.path.join(LOG_DIR, "upload_logs.txt")
 
-UIFORM_API_ENDPOINT = os.getenv("UIFORM_API_ENDPOINT")
-UIFORM_API_KEY = os.getenv("UIFORM_API_KEY")
-
 # Track processed files to avoid duplicates
 processed_files = set()
+
+def get_api_config(email):
+    """Get API configuration from user's settings."""
+    config = get_user_config(email)
+    if not config:
+        raise ValueError("No configuration found for user")
+    
+    api_key = config.get("uiform_api_key")
+    api_endpoint = config.get("uiform_api_endpoint")
+    
+    if not api_key or not api_endpoint:
+        raise ValueError("Missing UiForm API configuration")
+    
+    return api_key, api_endpoint
 
 def notify(title, message):
     try:
@@ -54,12 +65,12 @@ def log_event(status, filename, detail=""):
     with open(LOG_FILE, "a") as f:
         f.write(f"[{timestamp}] {status.upper()}: {filename} {detail}\n")
 
-def upload_file(file_path):
+def upload_file(file_path, api_key, api_endpoint):
     try:
         with open(file_path, "rb") as f:
             files = {"file": f}
-            headers = {"Api-Key": UIFORM_API_KEY}
-            response = requests.post(UIFORM_API_ENDPOINT, headers=headers, files=files)
+            headers = {"Api-Key": api_key}
+            response = requests.post(api_endpoint, headers=headers, files=files)
 
         filename = os.path.basename(file_path)
         profile_name = filename.split(" - Screenshot")[0] if " - Screenshot" in filename else filename
@@ -85,6 +96,7 @@ class ImageHandler(FileSystemEventHandler):
         self.email = email
         self.processed_files = set()  # Keep track of processed files
         self.last_processed_time = {}  # Keep track of last processed time for each file
+        self.api_key, self.api_endpoint = get_api_config(email)
 
     def on_created(self, event):
         if event.is_directory:
@@ -117,9 +129,9 @@ class ImageHandler(FileSystemEventHandler):
 
             with open(file_path, 'rb') as f:
                 files = {'file': (file_name, f, 'image/png')}
-                headers = {"Api-Key": UIFORM_API_KEY}
+                headers = {"Api-Key": self.api_key}
                 response = requests.post(
-                    UIFORM_API_ENDPOINT,
+                    self.api_endpoint,
                     headers=headers,
                     files=files
                 )
@@ -134,17 +146,24 @@ class ImageHandler(FileSystemEventHandler):
             print(f"Error processing {file_name}: {e}")
 
 def watch_folder(folder_path, email):
-    event_handler = ImageHandler(folder_path, email)
-    observer = Observer()
-    observer.schedule(event_handler, folder_path, recursive=False)
-    observer.start()
-
     try:
-        while True:
-            time.sleep(1)
-    except KeyboardInterrupt:
-        observer.stop()
-    observer.join()
+        # Verify API configuration before starting
+        get_api_config(email)
+        
+        event_handler = ImageHandler(folder_path, email)
+        observer = Observer()
+        observer.schedule(event_handler, folder_path, recursive=False)
+        observer.start()
+
+        try:
+            while True:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            observer.stop()
+        observer.join()
+    except ValueError as e:
+        print(f"Error: {e}")
+        sys.exit(1)
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:

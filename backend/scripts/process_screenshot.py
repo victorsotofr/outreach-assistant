@@ -1,19 +1,23 @@
 import os
 import sys
 import requests
+from datetime import datetime
+import json
 from dotenv import load_dotenv
 import time
 import subprocess
 
+# Add the parent directory to Python path
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, ".."))
 BACKEND_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, "..", ".."))
 sys.path.extend([PROJECT_ROOT, BACKEND_ROOT])
 
+# Load environment variables
 load_dotenv(os.path.join(PROJECT_ROOT, ".env"))
 
-UIFORM_API_ENDPOINT = os.getenv("UIFORM_API_ENDPOINT")
-UIFORM_API_KEY = os.getenv("UIFORM_API_KEY")
+# Import after path setup
+from db.config_db import get_user_config
 
 def notify(title, message):
     """Send a macOS notification."""
@@ -42,7 +46,21 @@ def notify(title, message):
         print(f"Warning: Could not send notification: {str(e)}")
         print(f"Error type: {type(e).__name__}")
 
-def process_file(file_path):
+def get_api_config(email):
+    """Get API configuration from user's settings."""
+    config = get_user_config(email)
+    if not config:
+        raise ValueError("No configuration found for user")
+    
+    api_key = config.get("uiform_api_key")
+    api_endpoint = config.get("uiform_api_endpoint")
+    
+    if not api_key or not api_endpoint:
+        raise ValueError("Missing UiForm API configuration")
+    
+    return api_key, api_endpoint
+
+def process_file(file_path, email):
     """Process a file by uploading it to UiForm API."""
     if not os.path.exists(file_path):
         print(f"Error: File not found: {file_path}")
@@ -57,6 +75,8 @@ def process_file(file_path):
     print(f"Processing file: {filename}")
 
     try:
+        api_key, api_endpoint = get_api_config(email)
+        
         with open(file_path, "rb") as f:
             file_content = f.read()
             
@@ -69,10 +89,10 @@ def process_file(file_path):
                 return False
 
             files = {"file": (filename, file_content, "image/png")}
-            headers = {"Api-Key": UIFORM_API_KEY}
+            headers = {"Api-Key": api_key}
             
             print(f"Uploading to UiForm API...")
-            response = requests.post(UIFORM_API_ENDPOINT, headers=headers, files=files, timeout=30)
+            response = requests.post(api_endpoint, headers=headers, files=files, timeout=30)
 
         if response.status_code == 200:
             print(f"✓ Successfully processed: {filename}")
@@ -104,11 +124,31 @@ def process_file(file_path):
         notify("Processing Failed", f"Error processing profile of {profile_name}")
         return False
 
-if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print("Usage: python process_screenshot.py <file_path>")
-        sys.exit(1)
+def process_screenshot(file_path, email):
+    try:
+        api_key, api_endpoint = get_api_config(email)
+        
+        with open(file_path, "rb") as f:
+            files = {"file": f}
+            headers = {"Api-Key": api_key}
+            response = requests.post(api_endpoint, headers=headers, files=files)
+            
+        if response.status_code == 200:
+            print(f"✓ Successfully processed: {os.path.basename(file_path)}")
+            return True
+        else:
+            print(f"❌ Failed to process {os.path.basename(file_path)}: {response.status_code} - {response.text}")
+            return False
+            
+    except Exception as e:
+        print(f"⚠️ Error processing {file_path}: {e}")
+        return False
 
+if __name__ == "__main__":
+    if len(sys.argv) < 3:
+        print("Usage: python process_screenshot.py <file_path> <email>")
+        sys.exit(1)
+        
     file_path = sys.argv[1]
-    success = process_file(file_path)
-    sys.exit(0 if success else 1) 
+    email = sys.argv[2]
+    process_screenshot(file_path, email) 

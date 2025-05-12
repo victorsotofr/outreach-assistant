@@ -15,6 +15,7 @@ templates = db["user_templates"]
 SENSITIVE_FIELDS = {
     "openai_api_key",
     "uiform_api_key",
+    "uiform_api_endpoint",
     "smtp_pass",
 }
 

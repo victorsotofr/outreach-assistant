@@ -147,20 +147,66 @@ async def start_watcher(request: Request):
     email = data.get("email")
     
     if not email:
-        raise HTTPException(status_code=400, detail="Email is required")
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "message": "Email is required",
+                "code": "MISSING_EMAIL",
+                "action": "Please make sure you are logged in"
+            }
+        )
     
     if not watch_folder:
-        raise HTTPException(status_code=400, detail="Please select a folder first")
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "message": "Please select a folder first",
+                "code": "MISSING_FOLDER",
+                "action": "Click the folder icon to select a folder to watch"
+            }
+        )
+    
+    # Verify user configuration before starting
+    try:
+        config = get_user_config(email)
+        if not config.get("uiform_api_key") or not config.get("uiform_api_endpoint"):
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "message": "UiForm API configuration is missing",
+                    "code": "MISSING_API_CONFIG",
+                    "action": "Please configure your UiForm API settings first"
+                }
+            )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "message": "Failed to verify configuration",
+                "code": "CONFIG_ERROR",
+                "action": "Please try again or contact support"
+            }
+        )
     
     print(f"Starting watcher for folder: {watch_folder}")
     
-    active_watcher = multiprocessing.Process(
-        target=run_script_background,
-        args=(watch_script, watch_folder, email),
-        name="watcher"
-    )
-    active_watcher.start()
-    return {"status": "ok"}
+    try:
+        active_watcher = multiprocessing.Process(
+            target=run_script_background,
+            args=(watch_script, watch_folder, email),
+            name="watcher"
+        )
+        active_watcher.start()
+        return {"status": "ok", "message": "Watcher started successfully"}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "message": "Failed to start watcher",
+                "code": "WATCHER_START_ERROR",
+                "action": "Please try again or contact support"
+            }
+        )
 
 @app.post("/watcher/stop")
 async def stop_watcher():
@@ -173,10 +219,17 @@ async def stop_watcher():
             if active_watcher.is_alive():
                 active_watcher.kill()
             active_watcher = None
-            return {"status": "ok"}
-        return {"status": "not running"}
+            return {"status": "ok", "message": "Watcher stopped successfully"}
+        return {"status": "not running", "message": "No active watcher found"}
     except Exception as e:
-        return {"error": str(e)}
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "message": "Failed to stop watcher",
+                "code": "WATCHER_STOP_ERROR",
+                "action": "Please try again or contact support"
+            }
+        )
 
 @app.get("/")
 async def root():
