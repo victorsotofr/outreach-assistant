@@ -5,9 +5,9 @@ import path from 'path';
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: Record<string, string> }
+  context: any 
 ) {
-  const { name } = params;
+  const { name } = context.params;
 
   try {
     const templatesDir = path.join(process.cwd(), 'backend', 'templates');
