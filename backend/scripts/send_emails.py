@@ -12,26 +12,27 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from openai import OpenAI
 import io
-from db.config_db import get_user_templates
+from db.config_db import get_user_templates, get_user_config
 
 # === PATH SETUP ===
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, ".."))
 load_dotenv(os.path.join(PROJECT_ROOT, ".env"))
 
-# === EMAIL CONFIG ===
-SMTP_USERNAME = os.getenv("SMTP_USERNAME")
-SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
-SMTP_SERVER = os.getenv("SMTP_SERVER")
-SMTP_PORT = int(os.getenv("SMTP_PORT"))
-FROM_EMAIL = SMTP_USERNAME
-
 # === DATA PATHS ===
 UPDATED_LIST_PATH = os.path.expanduser("~/Downloads/updated_contact_list.xlsx")
 SENT_EMAILS_PATH = os.path.expanduser("~/Downloads/sent_emails.json")
 
-# === OpenAI Client ===
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+def get_openai_client(email):
+    """Get OpenAI client with API key from user settings."""
+    config = get_user_config(email)
+    if not config:
+        raise ValueError("No configuration found for user")
+    
+    if not config.get('openai_api_key'):
+        raise ValueError("OpenAI API key not configured")
+    
+    return OpenAI(api_key=config['openai_api_key'])
 
 def get_templates(email):
     """Get templates from the database for the given user."""
@@ -53,6 +54,25 @@ def get_templates(email):
         raise ValueError("Both French and English templates must be configured")
     
     return template_fr, template_en
+
+def get_smtp_config(email):
+    """Get SMTP configuration from user settings."""
+    config = get_user_config(email)
+    if not config:
+        raise ValueError("No configuration found for user")
+    
+    required_fields = ['smtp_username', 'smtp_password', 'smtp_server', 'smtp_port']
+    missing_fields = [field for field in required_fields if not config.get(field)]
+    
+    if missing_fields:
+        raise ValueError(f"Missing SMTP configuration: {', '.join(missing_fields)}")
+    
+    return {
+        'username': config['smtp_username'],
+        'password': config['smtp_password'],
+        'server': config['smtp_server'],
+        'port': int(config['smtp_port'])
+    }
 
 def load_sent_emails():
     if os.path.exists(SENT_EMAILS_PATH):
@@ -86,7 +106,7 @@ def get_sheet_data(sheet_url):
     response.raise_for_status()
     return pd.read_csv(io.BytesIO(response.content), encoding="utf-8")
 
-def enrich_contact(contact):
+def enrich_contact(contact, client):
     prompt = f"""
 You are helping personalize professional emails for business executives. Here is the contact's information:
 
@@ -146,19 +166,18 @@ def fill_template(template, placeholders):
         template = template.replace(f"[{key.upper()}]", value)
     return template
 
-def send_email(to_email, subject, body):
+def send_email(to_email, subject, body, smtp_config):
     msg = MIMEMultipart()
-    msg["From"] = FROM_EMAIL
+    msg["From"] = smtp_config['username']
     msg["To"] = to_email
     msg["Subject"] = subject
-    msg["Bcc"] = FROM_EMAIL
+    msg["Bcc"] = smtp_config['username']
     msg.attach(MIMEText(body, "html"))
     
-    # Create a single SMTP connection for all emails
     try:
-        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+        with smtplib.SMTP(smtp_config['server'], smtp_config['port']) as server:
             server.starttls()
-            server.login(SMTP_USERNAME, SMTP_PASSWORD)
+            server.login(smtp_config['username'], smtp_config['password'])
             server.send_message(msg)
             return True
     except Exception as e:
@@ -174,8 +193,10 @@ def run_from_ui(sheet_url, preview_only=False, email=None):
         return
 
     try:
-        # Get templates from database
+        # Get templates, SMTP config, and OpenAI client from database
         template_fr, template_en = get_templates(email)
+        smtp_config = get_smtp_config(email)
+        openai_client = get_openai_client(email)
         
         # Read from Google Sheet
         df = get_sheet_data(sheet_url)
@@ -205,9 +226,9 @@ def run_from_ui(sheet_url, preview_only=False, email=None):
         # Create a single SMTP connection for all emails
         server = None
         try:
-            server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
+            server = smtplib.SMTP(smtp_config['server'], smtp_config['port'])
             server.starttls()
-            server.login(SMTP_USERNAME, SMTP_PASSWORD)
+            server.login(smtp_config['username'], smtp_config['password'])
             yield json.dumps({"type": "status", "message": "✓ SMTP connection established"})
 
             for _, row in df.iterrows():
@@ -221,7 +242,7 @@ def run_from_ui(sheet_url, preview_only=False, email=None):
                 yield json.dumps({"type": "status", "message": msg})
 
                 try:
-                    enriched = enrich_contact(row)
+                    enriched = enrich_contact(row, openai_client)
                     civility = enriched["civility"]
                     language = enriched["language"]
                     hq = enriched.get("hq", "")
@@ -243,19 +264,19 @@ def run_from_ui(sheet_url, preview_only=False, email=None):
 
                     # Create and send email using the existing connection
                     msg = MIMEMultipart()
-                    msg["From"] = FROM_EMAIL
+                    msg["From"] = smtp_config['username']
                     msg["To"] = email
                     msg["Subject"] = subject
-                    msg["Bcc"] = FROM_EMAIL
+                    msg["Bcc"] = smtp_config['username']
                     msg.attach(MIMEText(email_body, "html"))
 
                     try:
                         # Verify SMTP connection is still active
                         if not server.noop()[0] == 250:
                             yield json.dumps({"type": "error", "message": "SMTP connection lost, reconnecting..."})
-                            server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
+                            server = smtplib.SMTP(smtp_config['server'], smtp_config['port'])
                             server.starttls()
-                            server.login(SMTP_USERNAME, SMTP_PASSWORD)
+                            server.login(smtp_config['username'], smtp_config['password'])
 
                         server.send_message(msg)
                         enriched_rows.append({
