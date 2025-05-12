@@ -12,6 +12,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from openai import OpenAI
 import io
+from db.config_db import get_user_templates
 
 # === PATH SETUP ===
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -26,20 +27,32 @@ SMTP_PORT = int(os.getenv("SMTP_PORT"))
 FROM_EMAIL = SMTP_USERNAME
 
 # === DATA PATHS ===
-TEMPLATE_FR_PATH = os.path.join(PROJECT_ROOT, "templates", "template_fr.txt")
-TEMPLATE_EN_PATH = os.path.join(PROJECT_ROOT, "templates", "template_en.txt")
 UPDATED_LIST_PATH = os.path.expanduser("~/Downloads/updated_contact_list.xlsx")
 SENT_EMAILS_PATH = os.path.expanduser("~/Downloads/sent_emails.json")
 
-# === Load Templates ===
-with open(TEMPLATE_FR_PATH, "r", encoding="utf-8") as f:
-    template_fr = f.read()
-
-with open(TEMPLATE_EN_PATH, "r", encoding="utf-8") as f:
-    template_en = f.read()
-
 # === OpenAI Client ===
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+def get_templates(email):
+    """Get templates from the database for the given user."""
+    templates = get_user_templates(email)
+    if not templates:
+        raise ValueError("No templates found for user")
+    
+    # Find the French and English templates
+    template_fr = None
+    template_en = None
+    
+    for template in templates:
+        if template.get("name", "").lower() == "template_fr":
+            template_fr = template.get("content", "")
+        elif template.get("name", "").lower() == "template_en":
+            template_en = template.get("content", "")
+    
+    if not template_fr or not template_en:
+        raise ValueError("Both French and English templates must be configured")
+    
+    return template_fr, template_en
 
 def load_sent_emails():
     if os.path.exists(SENT_EMAILS_PATH):
@@ -151,12 +164,19 @@ def send_email(to_email, subject, body):
     except Exception as e:
         return str(e)
 
-def run_from_ui(sheet_url, preview_only=False):
+def run_from_ui(sheet_url, preview_only=False, email=None):
     if not sheet_url:
         yield json.dumps({"type": "error", "message": "Google Sheet URL is required"})
         return
+    
+    if not email:
+        yield json.dumps({"type": "error", "message": "User email is required"})
+        return
 
     try:
+        # Get templates from database
+        template_fr, template_en = get_templates(email)
+        
         # Read from Google Sheet
         df = get_sheet_data(sheet_url)
         if df.empty:
@@ -297,10 +317,11 @@ def run_from_ui(sheet_url, preview_only=False):
         yield json.dumps({"type": "error", "message": str(e)})
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("❌ Please provide the Google Sheet URL")
+    if len(sys.argv) < 3:
+        print("❌ Please provide the Google Sheet URL and user email")
         sys.exit(1)
 
     sheet_url = sys.argv[1]
-    for message in run_from_ui(sheet_url):
+    email = sys.argv[2]
+    for message in run_from_ui(sheet_url, email=email):
         print(message)
