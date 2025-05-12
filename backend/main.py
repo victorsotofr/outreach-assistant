@@ -5,7 +5,7 @@ import subprocess
 from scripts import send_emails
 from fastapi import FastAPI, Request, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from db.config_db import save_user_config, get_user_config, get_user_templates, save_template, delete_template, update_template
+from db.config_db import save_user_config, get_user_config, get_user_templates, save_template, delete_template, update_template, init_default_template
 from fastapi.responses import StreamingResponse
 import shutil
 from datetime import datetime
@@ -24,6 +24,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.on_event("startup")
+async def startup_event():
+    init_default_template()
 
 @app.post("/config")
 async def post_config(request: Request):
