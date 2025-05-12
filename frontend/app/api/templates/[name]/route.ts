@@ -1,11 +1,17 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
+type RouteContext = {
+  params: {
+    name: string;
+  };
+};
+
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { name: string } }
+  context: RouteContext
 ) {
-  const { name } = params;
+  const { name } = context.params;
   const email = request.nextUrl.searchParams.get('email');
 
   if (!email) {
