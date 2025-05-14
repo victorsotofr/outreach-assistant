@@ -152,17 +152,23 @@ export default function DashboardPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
       });
+      
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.detail || "Failed to select folder");
+      }
+      
       const data = await res.json();
-      if (res.ok && data.folder) {
+      if (data.folder) {
         setWatchFolder(data.folder);
         setIsFolderValidated(true);
-        toast.success("Folder selected");
+        toast.success(`Watch folder set to: ${data.folder}`);
       } else {
-        toast.error(data.error || "Failed to select folder");
+        throw new Error("No folder path received from server");
       }
     } catch (err) {
       console.error("Folder selection error:", err);
-      toast.error("Failed to select folder");
+      toast.error(err instanceof Error ? err.message : "Failed to select folder");
     }
   };
 

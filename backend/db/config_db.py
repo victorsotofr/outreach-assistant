@@ -5,13 +5,20 @@ from .encryption import encryption
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from contextlib import contextmanager
+from pathlib import Path
 
-load_dotenv()
+# Get the project root directory
+PROJECT_ROOT = Path(__file__).parent.parent
+
+# Load environment variables in order of priority
+load_dotenv(PROJECT_ROOT / ".env.production")  # Load production first
+load_dotenv(PROJECT_ROOT / ".env.development")  # Then development
+load_dotenv(PROJECT_ROOT / ".env")  # Finally, any local overrides
 
 # Database configuration from environment
 DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
-    raise ValueError("DATABASE_URL environment variable is not set")
+    raise ValueError("DATABASE_URL environment variable is not set. Please ensure it is set in your .env file.")
 
 SENSITIVE_FIELDS = {
     "openai_api_key",

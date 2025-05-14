@@ -2,6 +2,8 @@ import os
 import sys
 import multiprocessing
 import subprocess
+from pathlib import Path
+from dotenv import load_dotenv
 from scripts import send_emails
 from fastapi import FastAPI, Request, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,6 +13,14 @@ import shutil
 from datetime import datetime
 import pandas as pd
 import json
+
+# Get the project root directory
+PROJECT_ROOT = Path(__file__).parent
+
+# Load environment variables in order of priority
+load_dotenv(PROJECT_ROOT / ".env.production")  # Load production first
+load_dotenv(PROJECT_ROOT / ".env.development")  # Then development
+load_dotenv(PROJECT_ROOT / ".env")  # Finally, any local overrides
 
 app = FastAPI()
 
@@ -271,28 +281,19 @@ async def root():
 @app.post("/select-folder")
 def select_folder():
     """
-    Opens a native macOS 'choose folder' dialog
-    and returns its POSIX path. Raises 400 on cancel/error.
+    Returns a default folder path for the user's system.
+    In production, this will be a fixed path that the user can configure.
     """
-    script = 'POSIX path of (choose folder with prompt "Sélectionnez un dossier à surveiller")'
-    result = subprocess.run(
-        ['osascript', '-e', script],
-        capture_output=True, text=True
-    )
-
-    path = result.stdout.strip()
-
-    if result.returncode != 0 or not path:
-        raise HTTPException(status_code=400, detail="No folder selected")
-
-    if path.endswith("/"):
-        path = path[:-1]
-
-    if not os.path.exists(path):
-        raise HTTPException(status_code=400,
-                            detail="Selected folder does not exist")
-
-    return {"folder": path}
+    # Get the user's home directory
+    home_dir = os.path.expanduser("~")
+    
+    # Create a default watch folder in the user's home directory
+    watch_folder = os.path.join(home_dir, "uiform_watch")
+    
+    # Create the folder if it doesn't exist
+    os.makedirs(watch_folder, exist_ok=True)
+    
+    return {"folder": watch_folder}
 
 
 @app.get("/watcher/status")
