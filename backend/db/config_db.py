@@ -7,12 +7,12 @@ from bson import ObjectId
 
 load_dotenv()
 
-mongo_uri = os.getenv("MONGO_URI")
+# Check for both environment variable names (local and Render deployment)
+mongo_uri = os.getenv("MONGODB_URI") or os.getenv("MONGO_URI")
 client = MongoClient(
     mongo_uri,
     ssl=True,
-    ssl_cert_reqs=ssl.CERT_NONE,
-    tlsInsecure=True, 
+    tlsAllowInvalidCertificates=True 
 )
 db = client["uiform"]
 configs = db["user_configs"]
