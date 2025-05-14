@@ -16,10 +16,11 @@ app = FastAPI()
 
 # Get the frontend URL from environment variable or default to localhost
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
+PRODUCTION_URL = "https://uiform-outreach-assistant.vercel.app"
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[FRONTEND_URL],
+    allow_origins=[FRONTEND_URL, PRODUCTION_URL],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

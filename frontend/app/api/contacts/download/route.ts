@@ -9,7 +9,7 @@ export async function POST() {
     }
 
     // Get the user's Google Sheet URL from the backend
-    const configResponse = await fetch(`http://localhost:8000/config?email=${session.user.email}`);
+    const configResponse = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/config?email=${session.user.email}`);
     if (!configResponse.ok) {
       return NextResponse.json({ error: 'Failed to fetch configuration' }, { status: 500 });
     }
@@ -20,7 +20,7 @@ export async function POST() {
     }
 
     // Call the backend to download and process the contacts
-    const response = await fetch('http://localhost:8000/download-contacts', {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/download-contacts`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

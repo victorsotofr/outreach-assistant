@@ -26,7 +26,7 @@ const ContactPreviewDialog: React.FC<ContactPreviewDialogProps> = ({
     setIsComplete(false);
 
     try {
-      const response = await fetch("http://localhost:8000/send-emails", {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/send-emails`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

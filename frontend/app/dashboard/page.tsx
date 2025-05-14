@@ -77,7 +77,7 @@ export default function DashboardPage() {
     };
 
     try {
-      const res = await fetch(`http://localhost:8000${endpoint}`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -148,7 +148,7 @@ export default function DashboardPage() {
     }
 
     try {
-      const res = await fetch("http://localhost:8000/select-folder", {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/select-folder`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
       });
@@ -173,7 +173,7 @@ export default function DashboardPage() {
         throw new Error('Google Sheet URL not configured in settings');
       }
 
-      const response = await fetch('http://localhost:8000/download-contacts', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/download-contacts`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json'
@@ -213,7 +213,7 @@ export default function DashboardPage() {
       setIsSending(true);
       setEmailStatus([]);
 
-      const previewResponse = await fetch(`http://localhost:8000/sheet-preview?url=${encodeURIComponent(config.google_sheet_url)}`);
+      const previewResponse = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/sheet-preview?url=${encodeURIComponent(config.google_sheet_url)}`);
 
       if (!previewResponse.ok) {
         const errorText = await previewResponse.text();
@@ -244,7 +244,7 @@ export default function DashboardPage() {
 
   const streamEmailSending = async () => {
     try {
-      const response = await fetch("http://localhost:8000/send-emails", {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/send-emails`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -313,7 +313,7 @@ export default function DashboardPage() {
     if (!config?.google_sheet_url) return;
     
     try {
-      const response = await fetch(`http://localhost:8000/sheet-preview?url=${encodeURIComponent(config.google_sheet_url)}&rows=1000`);
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/sheet-preview?url=${encodeURIComponent(config.google_sheet_url)}&rows=1000`);
       if (response.ok) {
         const data = await response.json();
         setContactsProcessed(data.length);
@@ -331,7 +331,7 @@ export default function DashboardPage() {
     const fetchConfig = async () => {
       if (session?.user?.email) {
         try {
-          const response = await fetch(`http://localhost:8000/config?email=${session.user.email}`);
+          const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/config?email=${session.user.email}`);
           if (response.ok) {
             const data = await response.json();
             setConfig(data);

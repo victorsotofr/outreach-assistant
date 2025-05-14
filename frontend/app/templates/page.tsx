@@ -39,7 +39,7 @@ export default function TemplatesPage() {
 
   const fetchTemplates = async () => {
     try {
-      const response = await fetch(`http://localhost:8000/templates?email=${session?.user?.email}`);
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/templates?email=${session?.user?.email}`);
       if (response.ok) {
         const data = await response.json();
         setTemplates(data);
@@ -65,7 +65,7 @@ export default function TemplatesPage() {
     formData.append('email', session?.user?.email || '');
 
     try {
-      const response = await fetch(`http://localhost:8000/templates/upload`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/templates/upload`, {
         method: 'POST',
         body: formData,
       });
@@ -84,7 +84,7 @@ export default function TemplatesPage() {
 
   const handleDelete = async (templateName: string) => {
     try {
-      const response = await fetch(`http://localhost:8000/templates/${templateName}?email=${session?.user?.email}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/templates/${templateName}?email=${session?.user?.email}`, {
         method: 'DELETE',
       });
 
@@ -106,7 +106,7 @@ export default function TemplatesPage() {
     }
 
     try {
-      const response = await fetch('http://localhost:8000/templates', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/templates`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -144,7 +144,7 @@ export default function TemplatesPage() {
     }
 
     try {
-      const response = await fetch(`http://localhost:8000/templates/${editingTemplate.name}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/templates/${editingTemplate.name}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

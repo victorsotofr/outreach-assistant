@@ -1,6 +1,8 @@
 # UiForm Outreach Assistant
 
-The starting point was the following: as a Growth Engineer working to scale our great product at [UiForm](uiform.com), I wanted to reach out to **A LOT** of people. For this purpose, there are nice fee-paying existing Chrome extensions, but that poorly integrated in the sales outbound flow I had.
+Visit it [**HERE**](https://uiform-outreach-assistant.vercel.app/).
+
+The starting point was the following: as a Growth Engineer working to scale our great product at [UiForm](https://www.uiform.com/), I wanted to reach out to **A LOT** of people. For this purpose, there are nice fee-paying existing Chrome extensions, but that poorly integrated in the sales outbound flow I had.
 
 Problem — Analysis — Solution. 
 My idea was to use our product and the extensions to create a frictionless flow and scale our sales outbound. 

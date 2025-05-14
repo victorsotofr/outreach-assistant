@@ -34,7 +34,7 @@ export default function Settings() {
     if (status === "unauthenticated") router.push("/");
     if (!session?.user?.email) return;
 
-    fetch(`http://localhost:8000/config?email=${session.user.email}`)
+    fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/config?email=${session.user.email}`)
       .then(res => {
         if (!res.ok) throw new Error("Failed to fetch config");
         return res.json();
@@ -70,7 +70,7 @@ export default function Settings() {
     if (!session?.user?.email) return;
 
     try {
-      const res = await fetch("http://localhost:8000/config", {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/config`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
