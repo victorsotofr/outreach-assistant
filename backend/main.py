@@ -17,6 +17,8 @@ import requests
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 import logging
+import certifi
+import ssl
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -460,8 +462,12 @@ async def process_image(
         # Read file content
         contents = await file.read()
         
+        # Create a session with proper SSL configuration
+        session = requests.Session()
+        session.verify = certifi.where()  # Use certifi's certificate bundle
+        
         # Process with UiForm API
-        response = requests.post(
+        response = session.post(
             "https://api.uiform.com/v1/extract",
             headers={
                 "Authorization": f"Bearer {config.uiform_api_key}",
@@ -478,6 +484,16 @@ async def process_image(
             
         return {"message": "Image processed successfully"}
         
+    except requests.exceptions.SSLError as e:
+        logger.error(f"SSL Error: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "message": "SSL certificate verification failed",
+                "code": "SSL_ERROR",
+                "action": "Please ensure your system's SSL certificates are up to date"
+            }
+        )
     except Exception as e:
         logger.error(f"Error processing image: {str(e)}")
         raise HTTPException(
