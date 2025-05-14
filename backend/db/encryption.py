@@ -12,6 +12,15 @@ class Encryption:
 
     def _get_or_create_key(self):
         """Get existing key or create a new one."""
+        # First try to get key from environment variable
+        env_key = os.getenv('ENCRYPTION_KEY')
+        if env_key:
+            try:
+                return base64.urlsafe_b64decode(env_key.encode())
+            except Exception as e:
+                print(f"Warning: Invalid ENCRYPTION_KEY in environment: {e}")
+        
+        # Fall back to file-based key
         key_path = Path(__file__).parent / '.encryption_key'
         
         if key_path.exists():
