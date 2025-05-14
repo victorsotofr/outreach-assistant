@@ -7,7 +7,7 @@ My idea was to use our product and the extensions to create a frictionless flow 
 
 I did a cool stuff, it worked. After tens of sales meetings booked thanks to it, I share it to you.
 
-It's simple, especially thanks to [UiForm](uiform.com) — go check it out, their product is brillant.
+It's simple, especially thanks to [UiForm](https://www.uiform.com/) — go check it out, the product is brillant.
 
 
 -- 
