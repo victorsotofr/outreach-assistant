@@ -488,18 +488,22 @@ async def process_image(
         # Log the API endpoint and headers (excluding sensitive data)
         headers = {
             "Authorization": "Bearer [REDACTED]",
-            "Content-Type": "application/octet-stream"
+            "Content-Type": "multipart/form-data"
         }
         logger.info(f"Making request to {api_url} with headers: {headers}")
+        
+        # Prepare the file for upload
+        files = {
+            'file': (file.filename, contents, 'image/png')
+        }
         
         # Process with UiForm API
         response = session.post(
             api_url,
             headers={
-                "Authorization": f"Bearer {config.uiform_api_key}",
-                "Content-Type": "application/octet-stream"
+                "Authorization": f"Bearer {config.uiform_api_key}"
             },
-            data=contents,
+            files=files,
             timeout=30  # Add timeout
         )
         
