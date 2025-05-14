@@ -39,8 +39,8 @@ class Encryption:
             return encrypted_data
         try:
             return self.fernet.decrypt(encrypted_data.encode()).decode()
-        except Exception:
-            return encrypted_data  # Return original if decryption fails
+        except Exception as e:
+            raise ValueError(f"Failed to decrypt data: {str(e)}")
 
 # Create a singleton instance
 encryption = Encryption() 

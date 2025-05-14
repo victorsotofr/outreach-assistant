@@ -469,7 +469,21 @@ async def process_image(
         
         # Decrypt the API endpoint
         from db.config_db import encryption
-        api_url = encryption.decrypt(config.uiform_api_endpoint)
+        try:
+            api_url = encryption.decrypt(config.uiform_api_endpoint)
+            if not api_url.startswith(('http://', 'https://')):
+                raise ValueError("Invalid API endpoint URL")
+        except Exception as e:
+            logger.error(f"Failed to decrypt API endpoint: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail={
+                    "message": "Failed to decrypt API configuration",
+                    "code": "DECRYPTION_ERROR",
+                    "error": str(e),
+                    "action": "Please reconfigure your API settings"
+                }
+            )
         
         # Log the API endpoint and headers (excluding sensitive data)
         headers = {
