@@ -467,8 +467,11 @@ async def process_image(
         session = requests.Session()
         session.verify = certifi.where()  # Use certifi's certificate bundle
         
+        # Decrypt the API endpoint
+        from db.config_db import encryption
+        api_url = encryption.decrypt(config.uiform_api_endpoint)
+        
         # Log the API endpoint and headers (excluding sensitive data)
-        api_url = config.uiform_api_endpoint
         headers = {
             "Authorization": "Bearer [REDACTED]",
             "Content-Type": "application/octet-stream"
