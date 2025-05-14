@@ -2,7 +2,7 @@
 
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -11,6 +11,7 @@ import { FolderOpen } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { ArrowDownTrayIcon, PaperAirplaneIcon } from "@heroicons/react/24/outline";
 import ContactPreviewDialog from "@/components/ContactPreviewDialog";
+import { useDropzone } from "react-dropzone";
 
 interface Session {
   user?: {
@@ -32,9 +33,6 @@ export default function DashboardPage() {
   const { data: session, status } = useSession() as { data: Session | null, status: string };
   const router = useRouter();
 
-  const [isWatching, setIsWatching] = useState(false);
-  const [watchFolder, setWatchFolder] = useState("");
-  const [watcherSessionId, setWatcherSessionId] = useState<string | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [settings, setSettings] = useState<UserSettings>({});
@@ -47,8 +45,8 @@ export default function DashboardPage() {
   const [contactsProcessed, setContactsProcessed] = useState(0);
   const [emailsSent, setEmailsSent] = useState(0);
   const [missingSettings, setMissingSettings] = useState<string[]>([]);
-  const [isFolderValidated, setIsFolderValidated] = useState(false);
-  const [statusMessages, setStatusMessages] = useState<string[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{[key: string]: string}>({});
 
   // Load persisted values from localStorage on component mount
   useEffect(() => {
@@ -62,115 +60,6 @@ export default function DashboardPage() {
   useEffect(() => {
     localStorage.setItem('emailsSent', emailsSent.toString());
   }, [emailsSent]);
-
-  const toggleWatcher = async (checked: boolean) => {
-    const endpoint = checked ? "/watcher/start" : "/watcher/stop";
-    const payload = {
-      email: session?.user?.email,
-      ...(checked
-        ? { 
-            watchFolder, 
-            fileTypes: ["png"],
-            extensions: [".png"]
-          }
-        : { sessionId: watcherSessionId }),
-    };
-
-    try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}${endpoint}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      
-      if (!res.ok) {
-        const errorData = await res.json();
-        if (errorData.detail) {
-          // Handle structured error response
-          const { message, code, action } = errorData.detail;
-          let errorMessage = message;
-          
-          // Add action to the error message if available
-          if (action) {
-            errorMessage += `\n${action}`;
-          }
-          
-          // Handle specific error codes
-          switch (code) {
-            case "MISSING_EMAIL":
-              router.push("/"); // Redirect to login
-              break;
-            case "MISSING_FOLDER":
-              // Don't show error if user just needs to select a folder
-              if (checked) {
-                toast.error(errorMessage);
-              }
-              break;
-            case "MISSING_API_CONFIG":
-              router.push("/settings"); // Redirect to settings
-              break;
-            default:
-              toast.error(errorMessage);
-          }
-          
-          throw new Error(errorMessage);
-        } else {
-          // Handle legacy error format
-          throw new Error(errorData.detail || "Failed to toggle watcher");
-        }
-      }
-      
-      const data = await res.json();
-
-      if (checked) {
-        setWatcherSessionId(data.sessionId);
-        setIsWatching(true);
-        toast.success(data.message || "PNG file watcher started");
-      } else {
-        setWatcherSessionId(null);
-        setIsWatching(false);
-        toast.success(data.message || "PNG file watcher stopped");
-      }
-    } catch (err) {
-      console.error("Watcher error:", err);
-      // Only show error toast if it's not a handled error (like missing folder)
-      if (!(err instanceof Error && err.message.includes("Please select a folder first"))) {
-      toast.error(err instanceof Error ? err.message : "Failed to toggle watcher");
-      }
-      setIsWatching(!checked);
-    }
-  };
-
-  const handleSelectFolder = async () => {
-    if (isWatching) {
-      toast.error("Stop the watcher first");
-      return;
-    }
-
-    try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/select-folder`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-      });
-      
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.detail || "Failed to select folder");
-      }
-      
-      const data = await res.json();
-      if (data.folder) {
-        setWatchFolder(data.folder);
-        setIsFolderValidated(true);
-        toast.success(`Watch folder set to: ${data.folder}`);
-      } else {
-        throw new Error("No folder path received from server");
-      }
-    } catch (err) {
-      console.error("Folder selection error:", err);
-      toast.error(err instanceof Error ? err.message : "Failed to select folder");
-    }
-  };
 
   const handleDownload = async () => {
     setIsDownloading(true);
@@ -329,6 +218,61 @@ export default function DashboardPage() {
     }
   };
 
+  const onDrop = useCallback(async (acceptedFiles: File[]) => {
+    if (!session?.user?.email) {
+      toast.error("Please log in to process images");
+      return;
+    }
+
+    setIsUploading(true);
+    const newProgress = { ...uploadProgress };
+
+    for (const file of acceptedFiles) {
+      if (!file.name.toLowerCase().endsWith('.png')) {
+        toast.error(`${file.name} is not a PNG file`);
+        continue;
+      }
+
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('email', session.user.email);
+
+        newProgress[file.name] = 'uploading';
+        setUploadProgress(newProgress);
+
+        const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/process-image`, {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.detail || 'Failed to process image');
+        }
+
+        newProgress[file.name] = 'success';
+        setUploadProgress(newProgress);
+        toast.success(`Successfully processed ${file.name}`);
+      } catch (error) {
+        console.error('Upload error:', error);
+        newProgress[file.name] = 'error';
+        setUploadProgress(newProgress);
+        toast.error(`Failed to process ${file.name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    }
+
+    setIsUploading(false);
+  }, [session?.user?.email, uploadProgress]);
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: {
+      'image/png': ['.png']
+    },
+    disabled: isUploading
+  });
+
   useEffect(() => {
     if (status === "unauthenticated") router.push("/");
   }, [status, router]);
@@ -409,23 +353,7 @@ export default function DashboardPage() {
 
           <Card>
             <CardContent className="p-6">
-              <div className="grid grid-cols-3 gap-8">
-                <div className="flex flex-col items-center">
-                  <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-3 ${
-                    isWatching ? 'bg-green-100' : 'bg-gray-100'
-                  }`}>
-                    <div className={`w-8 h-8 rounded-full ${
-                      isWatching ? 'bg-green-500 animate-pulse' : 'bg-gray-400'
-                    }`} />
-                  </div>
-                  <span className="text-sm text-gray-600">Processing Status</span>
-                  <span className={`text-lg font-semibold ${
-                    isWatching ? 'text-green-600' : 'text-gray-600'
-                  }`}>
-                    {isWatching ? 'Active' : 'Inactive'}
-                  </span>
-                </div>
-
+              <div className="grid grid-cols-2 gap-8">
                 <div className="flex flex-col items-center">
                   <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center mb-3">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -448,88 +376,52 @@ export default function DashboardPage() {
               </div>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardContent className="p-6 space-y-4">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <h2 className="text-lg font-semibold">Bucker Folder</h2>
-                  {isFolderValidated && (
-                    <span className="text-green-500">✓</span>
-                  )}
-                </div>
+                <h2 className="text-lg font-semibold">Process Images</h2>
                 <div className="flex items-center gap-3">
-                  <span className="text-sm text-gray-600">Process PNG files from your Selected Bucket Folder:</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-gray-500">Off</span>
-                    <Switch
-                      checked={isWatching}
-                      onCheckedChange={toggleWatcher}
-                    />
-                    <span className="text-sm text-gray-500">On</span>
-                  </div>
+                  <span className="text-sm text-gray-600">Drop PNG files to process them automatically</span>
                 </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <FolderOpen className="h-4 w-4 text-gray-500" />
-                <Input
-                  value={watchFolder}
-                  readOnly
-                  placeholder="Select a folder to watch"
-                  className="flex-1"
-                  disabled={isWatching}
-                />
-                <Button
-                  onClick={handleSelectFolder}
-                  disabled={isWatching}
-                  variant="outline"
-                >
-                  Select
-                </Button>
               </div>
 
-              {isWatching && (
-                <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
-                  <div className="flex items-start gap-2">
-                    <div className="bg-blue-100 p-1 rounded-full">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-600">
-                        <circle cx="12" cy="12" r="10" />
-                        <path d="M12 16v-4" />
-                        <path d="M12 8h.01" />
-                      </svg>
+              <div
+                {...getRootProps()}
+                className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors
+                  ${isDragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-gray-400'}
+                  ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                <input {...getInputProps()} />
+                <div className="space-y-2">
+                  <FolderOpen className="h-12 w-12 mx-auto text-gray-400" />
+                  {isDragActive ? (
+                    <p className="text-blue-600">Drop the files here...</p>
+                  ) : (
+                    <div className="space-y-1">
+                      <p className="text-gray-600">Drag & drop PNG files here, or click to select files</p>
+                      <p className="text-sm text-gray-500">Only PNG files are supported</p>
                     </div>
-                    <div className="space-y-2">
-                      <p className="text-sm text-blue-700 font-medium">Watcher is active</p>
-                      <p className="text-sm text-blue-600">
-                        Drop your documents (e.g. Screenshots) in the selected folder to process them automatically.
-                      </p>
-                      <p className="text-sm text-blue-600">
-                        Supported formats: PNG
-                      </p>
-                      <div className="text-sm text-blue-600 space-y-1">
-                        <p>
-                          • View your processing schema at{" "}
-                          <a 
-                            href="https://www.uiform.com/dashboard/deployments" 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="underline hover:text-blue-800"
-                          >
-                            UiForm Deployments
-                          </a>
-                        </p>
-                        <p>
-                          • View your extractions in your configured Google Sheet. See the link in{" "}
-                          <a 
-                            href="/settings"
-                            className="underline hover:text-blue-800"
-                          >
-                            Settings
-                          </a>
-                        </p>
-                      </div>
+                  )}
+                </div>
+              </div>
+
+              {Object.keys(uploadProgress).length > 0 && (
+                <div className="mt-4 space-y-2">
+                  {Object.entries(uploadProgress).map(([filename, status]) => (
+                    <div key={filename} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                      <span className="text-sm text-gray-600">{filename}</span>
+                      <span className={`text-sm ${
+                        status === 'success' ? 'text-green-600' :
+                        status === 'error' ? 'text-red-600' :
+                        'text-blue-600'
+                      }`}>
+                        {status === 'success' ? '✓ Processed' :
+                         status === 'error' ? '✕ Failed' :
+                         '⟳ Processing...'}
+                      </span>
                     </div>
-                  </div>
+                  ))}
                 </div>
               )}
             </CardContent>
@@ -540,7 +432,7 @@ export default function DashboardPage() {
               <div className="grid grid-cols-2 gap-4">
                 <button
                   onClick={handleDownload}
-                  disabled={isDownloading || !config?.google_sheet_url || isWatching}
+                  disabled={isDownloading || !config?.google_sheet_url}
                   className={`flex flex-col items-center justify-center p-6 rounded-xl transition-all duration-200 ${
                     isDownloading
                       ? 'bg-blue-50 border-2 border-blue-500'
@@ -555,7 +447,7 @@ export default function DashboardPage() {
 
                 <button
                   onClick={handleSendEmails}
-                  disabled={isSending || !config?.google_sheet_url || isWatching}
+                  disabled={isSending || !config?.google_sheet_url}
                   className={`flex flex-col items-center justify-center p-6 rounded-xl transition-all duration-200 ${
                     isSending
                       ? 'bg-purple-50 border-2 border-purple-500'

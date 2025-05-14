@@ -21,6 +21,7 @@
     "next-auth": "^4.24.11",
     "react": "latest",
     "react-dom": "latest",
+    "react-dropzone": "^14.3.8",
     "sonner": "^2.0.3",
     "tailwind-merge": "^3.1.0",
     "tw-animate-css": "^1.2.5"

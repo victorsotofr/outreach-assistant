@@ -5,17 +5,25 @@ import subprocess
 from pathlib import Path
 from dotenv import load_dotenv
 from scripts import send_emails
-from fastapi import FastAPI, Request, UploadFile, File, Form, HTTPException
+from fastapi import FastAPI, Request, UploadFile, File, Form, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from db.config_db import save_user_config, get_user_config, get_user_templates, save_template, delete_template, update_template, init_default_template
-from fastapi.responses import StreamingResponse
+from db.config_db import save_user_config, get_user_config, get_user_templates, save_template, delete_template, update_template, init_default_template, get_db, UserSettings, UserConfig
+from fastapi.responses import StreamingResponse, JSONResponse
 import shutil
 from datetime import datetime
 import pandas as pd
 import json
+import requests
+from sqlalchemy.orm import Session
+from sqlalchemy import select
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Get the project root directory
-PROJECT_ROOT = Path(__file__).parent
+PROJECT_ROOT = Path(__file__).parent.parent
 
 # Load environment variables in order of priority
 load_dotenv(PROJECT_ROOT / ".env.production")  # Load production first
@@ -421,6 +429,61 @@ def delete_processed_files():
     for file in os.listdir(processed_dir):
         if file.endswith('.png'):
             os.remove(os.path.join(processed_dir, file))
+
+
+@app.post("/process-image")
+async def process_image(
+    file: UploadFile = File(...),
+    email: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    """
+    Process a single image file and extract data using UiForm API.
+    The file is processed in memory without saving to disk.
+    """
+    if not file.filename.lower().endswith('.png'):
+        raise HTTPException(status_code=400, detail="Only PNG files are supported")
+
+    # Get user's API configuration
+    config = db.query(UserConfig).filter(UserConfig.email == email).first()
+    if not config or not config.uiform_api_key:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "message": "UiForm API key not configured",
+                "code": "MISSING_API_CONFIG",
+                "action": "Please configure your UiForm API key in settings"
+            }
+        )
+
+    try:
+        # Read file content
+        contents = await file.read()
+        
+        # Process with UiForm API
+        response = requests.post(
+            "https://api.uiform.com/v1/extract",
+            headers={
+                "Authorization": f"Bearer {config.uiform_api_key}",
+                "Content-Type": "application/octet-stream"
+            },
+            data=contents
+        )
+        
+        if response.status_code != 200:
+            raise HTTPException(
+                status_code=response.status_code,
+                detail=f"UiForm API error: {response.text}"
+            )
+            
+        return {"message": "Image processed successfully"}
+        
+    except Exception as e:
+        logger.error(f"Error processing image: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to process image: {str(e)}"
+        )
 
 
 if __name__ == "__main__":
