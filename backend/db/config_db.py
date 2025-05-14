@@ -8,8 +8,10 @@ from contextlib import contextmanager
 
 load_dotenv()
 
-# Database configuration
+# Database configuration from environment
 DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    raise ValueError("DATABASE_URL environment variable is not set")
 
 SENSITIVE_FIELDS = {
     "openai_api_key",

@@ -35,6 +35,8 @@ wheels/
 
 # Environment
 .env
+.env.local
+.env.production
 .venv
 venv/
 ENV/

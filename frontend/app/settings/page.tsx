@@ -22,24 +22,32 @@ export default function Settings() {
   const [smtpPort, setSmtpPort] = useState("");
   const [googleSheetUrl, setGoogleSheetUrl] = useState("");
 
-  const [visibleFields, setVisibleFields] = useState<{ [key: string]: boolean }>({});
+  const [visibleFields, setVisibleFields] = useState<{ [key: string]: boolean }>({
+    uiform_api_key: false,
+    openai_api_key: false,
+    smtp_pass: false
+  });
   const [savedFields, setSavedFields] = useState<{ [key: string]: boolean }>({});
   const [savedSection, setSavedSection] = useState<null | string>(null);
 
   const toggleVisibility = (field: string) => {
-    setVisibleFields((prev) => ({ ...prev, [field]: !prev[field] }));
+    setVisibleFields((prev) => {
+      const newState = { ...prev, [field]: !prev[field] };
+      return newState;
+    });
   };
 
   useEffect(() => {
     if (status === "unauthenticated") router.push("/");
     if (!session?.user?.email) return;
 
-    fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/config?email=${session.user.email}`)
-      .then(res => {
+    const fetchConfig = async () => {
+      if (!session?.user?.email) return;
+      try {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/config?email=${session.user.email}`);
         if (!res.ok) throw new Error("Failed to fetch config");
-        return res.json();
-      })
-      .then(data => {
+        const data = await res.json();
+        
         setUiFormKey(data.uiform_api_key || "");
         setUiFormEndpoint(data.uiform_api_endpoint || "");
         setOpenAiKey(data.openai_api_key || "");
@@ -59,11 +67,13 @@ export default function Settings() {
           smtp_port: !!data.smtp_port,
           google_sheet_url: !!data.google_sheet_url,
         });
-      })
-      .catch(err => {
+      } catch (err) {
         console.error("Error loading settings:", err);
         toast.error("Failed to load settings from server.");
-      });
+      }
+    };
+
+    fetchConfig();
   }, [status, router, session]);
 
   const save = async (section: string) => {
@@ -72,7 +82,10 @@ export default function Settings() {
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/config`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
         body: JSON.stringify({
           email: session.user.email,
           config: {
@@ -88,7 +101,11 @@ export default function Settings() {
         }),
       });
 
-      if (!res.ok) throw new Error("Save failed");
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Save failed");
+      }
+
       setSavedSection(section);
       setTimeout(() => setSavedSection(null), 3000);
       toast.success(`✓ ${section} saved.`);
@@ -109,7 +126,7 @@ export default function Settings() {
       }));
     } catch (err) {
       console.error("Save error:", err);
-      toast.error("Failed to save your settings.");
+      toast.error(err instanceof Error ? err.message : "Failed to save your settings.");
     }
   };
 
@@ -130,12 +147,14 @@ export default function Settings() {
           className={`pr-10 ${!value ? "border-red-500" : savedFields[key] ? "bg-green-50 border-green-200" : ""}`}
         />
         {(type === "password" || key.includes("key") || key.includes("pass")) && (
-          <div
-            className="absolute inset-y-0 right-3 flex items-center cursor-pointer"
+          <button
+            type="button"
+            className="absolute inset-y-0 right-3 flex items-center cursor-pointer hover:bg-gray-100 rounded-r-md px-2"
             onClick={() => toggleVisibility(key)}
+            aria-label={visibleFields[key] ? "Hide" : "Show"}
           >
             {visibleFields[key] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-          </div>
+          </button>
         )}
       </div>
       {!value && <p className="text-sm text-red-500">Required</p>}

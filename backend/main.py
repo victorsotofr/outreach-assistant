@@ -14,9 +14,9 @@ import json
 
 app = FastAPI()
 
-# Get the frontend URL from environment variable or default to localhost
+# Get infrastructure config from environment variables
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
-PRODUCTION_URL = "https://uiform-outreach-assistant.vercel.app"
+PRODUCTION_URL = os.getenv("PRODUCTION_URL", "https://uiform-outreach-assistant.vercel.app")
 
 app.add_middleware(
     CORSMiddleware,
