@@ -34,15 +34,19 @@ Best regards,
 @contextmanager
 def get_db_connection():
     """Context manager for database connections."""
-    # Configure SSL for Render PostgreSQL
-    conn = psycopg2.connect(
-        DATABASE_URL,
-        sslmode='require'  # Required for Render PostgreSQL
-    )
     try:
-        yield conn
-    finally:
-        conn.close()
+        # Configure SSL for Render PostgreSQL
+        conn = psycopg2.connect(
+            DATABASE_URL,
+            sslmode='require'  # Required for Render PostgreSQL
+        )
+        try:
+            yield conn
+        finally:
+            conn.close()
+    except psycopg2.OperationalError as e:
+        print(f"Database connection error: {str(e)}")
+        raise
 
 def init_db():
     """Initialize database tables if they don't exist."""
