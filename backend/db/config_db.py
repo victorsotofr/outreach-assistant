@@ -6,6 +6,10 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 from contextlib import contextmanager
 from pathlib import Path
+from sqlalchemy import create_engine, Column, String, Integer, Boolean, DateTime, ForeignKey, Text, ARRAY
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker, Session
+from datetime import datetime
 
 # Get the project root directory
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -19,6 +23,50 @@ load_dotenv(PROJECT_ROOT / ".env")  # Finally, any local overrides
 DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
     raise ValueError("DATABASE_URL environment variable is not set. Please ensure it is set in your .env file.")
+
+# SQLAlchemy setup
+engine = create_engine(DATABASE_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
+
+# SQLAlchemy Models
+class UserConfig(Base):
+    __tablename__ = "user_configs"
+
+    email = Column(String(255), primary_key=True)
+    google_sheet_url = Column(Text)
+    openai_api_key = Column(Text)
+    smtp_pass = Column(Text)
+    smtp_port = Column(Integer)
+    smtp_server = Column(Text)
+    smtp_user = Column(Text)
+    uiform_api_key = Column(Text)
+    watched_file_types = Column(ARRAY(Text))
+    uiform_api_endpoint = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class UserTemplate(Base):
+    __tablename__ = "user_templates"
+
+    id = Column(Integer, primary_key=True)
+    email = Column(String(255), ForeignKey("user_configs.email"))
+    name = Column(String(255))
+    content = Column(Text)
+    is_default = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+# Create all tables
+Base.metadata.create_all(bind=engine)
+
+# Database session dependency
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 SENSITIVE_FIELDS = {
     "openai_api_key",
