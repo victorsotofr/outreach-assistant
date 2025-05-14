@@ -198,12 +198,12 @@ async def start_watcher(request: Request):
     print(f"Starting watcher for folder: {watch_folder}")
     
     try:
-        active_watcher = multiprocessing.Process(
-            target=run_script_background,
-            args=(watch_script, watch_folder, email),
-            name="watcher"
-        )
-        active_watcher.start()
+    active_watcher = multiprocessing.Process(
+        target=run_script_background,
+        args=(watch_script, watch_folder, email),
+        name="watcher"
+    )
+    active_watcher.start()
         return {"status": "ok", "message": "Watcher started successfully"}
     except Exception as e:
         raise HTTPException(
@@ -382,7 +382,7 @@ def delete_processed_files():
         
     for file in os.listdir(processed_dir):
         if file.endswith('.png'):
-            os.remove(os.path.join(processed_dir, file))
+            os.remove(os.path.join(processed_dir, file)) 
 
 if __name__ == "__main__":
     import uvicorn

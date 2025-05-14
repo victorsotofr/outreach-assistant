@@ -150,17 +150,17 @@ def watch_folder(folder_path, email):
         # Verify API configuration before starting
         get_api_config(email)
         
-        event_handler = ImageHandler(folder_path, email)
-        observer = Observer()
-        observer.schedule(event_handler, folder_path, recursive=False)
-        observer.start()
+    event_handler = ImageHandler(folder_path, email)
+    observer = Observer()
+    observer.schedule(event_handler, folder_path, recursive=False)
+    observer.start()
 
-        try:
-            while True:
-                time.sleep(1)
-        except KeyboardInterrupt:
-            observer.stop()
-        observer.join()
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        observer.stop()
+    observer.join()
     except ValueError as e:
         print(f"Error: {e}")
         sys.exit(1)

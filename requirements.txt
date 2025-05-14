@@ -4,7 +4,7 @@ python-dotenv
 requests
 fastapi
 uvicorn
-pymongo
+psycopg2-binary
 
 # Email
 smtplib

@@ -135,7 +135,7 @@ export default function DashboardPage() {
       console.error("Watcher error:", err);
       // Only show error toast if it's not a handled error (like missing folder)
       if (!(err instanceof Error && err.message.includes("Please select a folder first"))) {
-        toast.error(err instanceof Error ? err.message : "Failed to toggle watcher");
+      toast.error(err instanceof Error ? err.message : "Failed to toggle watcher");
       }
       setIsWatching(!checked);
     }

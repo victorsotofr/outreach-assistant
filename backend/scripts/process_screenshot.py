@@ -148,7 +148,7 @@ if __name__ == "__main__":
     if len(sys.argv) < 3:
         print("Usage: python process_screenshot.py <file_path> <email>")
         sys.exit(1)
-        
+
     file_path = sys.argv[1]
     email = sys.argv[2]
     process_screenshot(file_path, email) 
