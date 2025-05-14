@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from scripts import send_emails
 from fastapi import FastAPI, Request, UploadFile, File, Form, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from db.config_db import save_user_config, get_user_config, get_user_templates, save_template, delete_template, update_template, init_default_template, get_db, UserSettings, UserConfig
+from db.config_db import save_user_config, get_user_config, get_user_templates, save_template, delete_template, update_template, init_default_template, get_db, UserConfig
 from fastapi.responses import StreamingResponse, JSONResponse
 import shutil
 from datetime import datetime
