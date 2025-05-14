@@ -448,57 +448,103 @@ async def process_image(
 
     # Get user's API configuration
     config = db.query(UserConfig).filter(UserConfig.email == email).first()
-    if not config or not config.uiform_api_key:
+    if not config or not config.uiform_api_key or not config.uiform_api_endpoint:
         raise HTTPException(
             status_code=400,
             detail={
-                "message": "UiForm API key not configured",
+                "message": "UiForm API configuration is missing",
                 "code": "MISSING_API_CONFIG",
-                "action": "Please configure your UiForm API key in settings"
+                "action": "Please configure your UiForm API settings first"
             }
         )
 
     try:
         # Read file content
         contents = await file.read()
+        logger.info(f"Processing image for user {email}, file size: {len(contents)} bytes")
         
         # Create a session with proper SSL configuration
         session = requests.Session()
         session.verify = certifi.where()  # Use certifi's certificate bundle
         
+        # Log the API endpoint and headers (excluding sensitive data)
+        api_url = config.uiform_api_endpoint
+        headers = {
+            "Authorization": "Bearer [REDACTED]",
+            "Content-Type": "application/octet-stream"
+        }
+        logger.info(f"Making request to {api_url} with headers: {headers}")
+        
         # Process with UiForm API
         response = session.post(
-            "https://api.uiform.com/v1/extract",
+            api_url,
             headers={
                 "Authorization": f"Bearer {config.uiform_api_key}",
                 "Content-Type": "application/octet-stream"
             },
-            data=contents
+            data=contents,
+            timeout=30  # Add timeout
         )
         
+        logger.info(f"API Response status code: {response.status_code}")
+        
         if response.status_code != 200:
+            error_detail = f"UiForm API error: Status {response.status_code}, Response: {response.text}"
+            logger.error(error_detail)
             raise HTTPException(
                 status_code=response.status_code,
-                detail=f"UiForm API error: {response.text}"
+                detail=error_detail
             )
             
         return {"message": "Image processed successfully"}
         
     except requests.exceptions.SSLError as e:
-        logger.error(f"SSL Error: {str(e)}")
+        error_msg = f"SSL Error: {str(e)}"
+        logger.error(error_msg)
         raise HTTPException(
             status_code=500,
             detail={
                 "message": "SSL certificate verification failed",
                 "code": "SSL_ERROR",
+                "error": str(e),
                 "action": "Please ensure your system's SSL certificates are up to date"
             }
         )
-    except Exception as e:
-        logger.error(f"Error processing image: {str(e)}")
+    except requests.exceptions.ConnectionError as e:
+        error_msg = f"Connection Error: {str(e)}"
+        logger.error(error_msg)
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to process image: {str(e)}"
+            detail={
+                "message": "Failed to connect to UiForm API",
+                "code": "CONNECTION_ERROR",
+                "error": str(e),
+                "action": "Please check your internet connection and try again"
+            }
+        )
+    except requests.exceptions.Timeout as e:
+        error_msg = f"Timeout Error: {str(e)}"
+        logger.error(error_msg)
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "message": "Request to UiForm API timed out",
+                "code": "TIMEOUT_ERROR",
+                "error": str(e),
+                "action": "Please try again later"
+            }
+        )
+    except Exception as e:
+        error_msg = f"Error processing image: {str(e)}"
+        logger.error(error_msg, exc_info=True)  # Include full traceback
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "message": "Failed to process image",
+                "code": "PROCESSING_ERROR",
+                "error": str(e),
+                "action": "Please try again or contact support"
+            }
         )
 
 
