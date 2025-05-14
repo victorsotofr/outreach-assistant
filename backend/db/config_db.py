@@ -1,4 +1,5 @@
 import os
+import ssl
 from pymongo import MongoClient
 from dotenv import load_dotenv
 from .encryption import encryption
@@ -6,7 +7,13 @@ from bson import ObjectId
 
 load_dotenv()
 
-client = MongoClient(os.getenv("MONGO_URI"))
+mongo_uri = os.getenv("MONGO_URI")
+client = MongoClient(
+    mongo_uri,
+    ssl=True,
+    ssl_cert_reqs=ssl.CERT_NONE,
+    tlsInsecure=True, 
+)
 db = client["uiform"]
 configs = db["user_configs"]
 templates = db["user_templates"]
