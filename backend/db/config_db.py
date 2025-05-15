@@ -207,10 +207,24 @@ def get_user_config(email: str):
                     encrypted_config = encrypt_sensitive_fields(decrypted_config)
                     cur.execute("""
                         UPDATE user_configs 
-                        SET openai_api_key = %s
+                        SET openai_api_key = %s,
+                            smtp_pass = %s,
+                            uiform_api_key = %s,
+                            uiform_api_endpoint = %s
                         WHERE email = %s
-                    """, (encrypted_config['openai_api_key'], email))
+                    """, (
+                        encrypted_config.get('openai_api_key'),
+                        encrypted_config.get('smtp_pass'),
+                        encrypted_config.get('uiform_api_key'),
+                        encrypted_config.get('uiform_api_endpoint'),
+                        email
+                    ))
                     conn.commit()
+                
+                # Mask sensitive fields in the returned config
+                for field in SENSITIVE_FIELDS:
+                    if field in decrypted_config and decrypted_config[field]:
+                        decrypted_config[field] = '********'
                 
                 return decrypted_config
             return {}

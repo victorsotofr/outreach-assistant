@@ -37,18 +37,16 @@ UPDATED_LIST_PATH = get_downloads_path()
 SENT_EMAILS_PATH = os.path.expanduser("~/Downloads/sent_emails.json")
 
 def get_openai_client(email):
+    """Get OpenAI client with API key from user settings."""
     config = get_user_config(email)
     if not config:
         raise ValueError("No configuration found for user")
-
+    
     if not config.get('openai_api_key'):
         raise ValueError("OpenAI API key not configured")
-
-    # Explicitly pass only supported keys
-    return OpenAI(
-        api_key=config['openai_api_key'],
-        base_url="https://api.openai.com/v1"
-    )
+    
+    # Create client with API key - using the correct initialization for v1.25.1
+    return OpenAI(api_key=config['openai_api_key'])
 
 def get_templates(email):
     """Get templates from the database for the given user."""
@@ -115,6 +113,15 @@ def get_smtp_config(email):
         raise ValueError("Invalid SMTP password configuration")
     
     print(f"SMTP configuration validated for server: {smtp_server}:{smtp_port}")
+    
+    # Log masked config for debugging
+    masked_config = {
+        'username': smtp_user,
+        'password': '********',
+        'server': smtp_server,
+        'port': smtp_port
+    }
+    print(f"SMTP config: {masked_config}")
     
     return {
         'username': smtp_user,
