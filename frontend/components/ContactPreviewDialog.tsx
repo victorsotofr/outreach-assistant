@@ -24,6 +24,38 @@ const ContactPreviewDialog: React.FC<ContactPreviewDialogProps> = ({
   const [isComplete, setIsComplete] = useState(false);
   const [useCc, setUseCc] = useState(false);
 
+  const handleDownload = async () => {
+    try {
+      const downloadResponse = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/download-contacts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email,
+          sheet_url: sheetUrl,
+          action: "download"
+        }),
+      });
+
+      if (!downloadResponse.ok) {
+        throw new Error("Failed to download updated contacts");
+      }
+
+      const blob = await downloadResponse.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "enriched_contact_list.xlsx";
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast.success("✓ Enriched contact list downloaded");
+    } catch (downloadError) {
+      console.error("Error downloading enriched contacts:", downloadError);
+      toast.error("Failed to download enriched contacts");
+    }
+  };
+
   const handleConfirm = async () => {
     setIsSending(true);
     setShowStreamingDialog(true);
@@ -62,7 +94,6 @@ const ContactPreviewDialog: React.FC<ContactPreviewDialogProps> = ({
             const cleanLine = line.replace(/^data: /, "").trim();
             if (!cleanLine) continue;
             
-            // Handle both JSON and plain text messages
             let message;
             let type = "status";
             try {
@@ -70,12 +101,11 @@ const ContactPreviewDialog: React.FC<ContactPreviewDialogProps> = ({
               message = parsed.message;
               type = parsed.type || "status";
             } catch {
-              // If not JSON, use the line as is
               message = cleanLine;
             }
 
             if (message) {
-              console.log(`[${type}] ${message}`); // Add console logging
+              console.log(`[${type}] ${message}`);
               
               if (type === "error") {
                 toast.error(message);
@@ -89,38 +119,11 @@ const ContactPreviewDialog: React.FC<ContactPreviewDialogProps> = ({
                 setIsComplete(true);
                 toast.success("✓ All emails sent successfully");
                 setIsSending(false);
-
-                // Download the updated contact list
-                try {
-                  const downloadResponse = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/download-contacts`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                      email,
-                      sheet_url: sheetUrl,
-                      action: "download"
-                    }),
-                  });
-
-                  if (!downloadResponse.ok) {
-                    throw new Error("Failed to download updated contacts");
-                  }
-
-                  const blob = await downloadResponse.blob();
-                  const url = window.URL.createObjectURL(blob);
-                  const a = document.createElement("a");
-                  a.href = url;
-                  a.download = "updated_contacts.xlsx";
-                  document.body.appendChild(a);
-                  a.click();
-                  window.URL.revokeObjectURL(url);
-                  document.body.removeChild(a);
-                  toast.success("✓ Updated contact list downloaded");
-                } catch (downloadError) {
-                  console.error("Error downloading updated contacts:", downloadError);
-                  toast.error("Failed to download updated contacts");
-                }
-
+                
+                // Automatically download the enriched contact list
+                await handleDownload();
+                
+                // Close the dialog after a short delay
                 setTimeout(() => {
                   setShowStreamingDialog(false);
                   onClose();
