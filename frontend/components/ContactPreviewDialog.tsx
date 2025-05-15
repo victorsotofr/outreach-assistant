@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
+import { toast } from "react-hot-toast";
 
 interface ContactPreviewDialogProps {
   data: any[];
@@ -38,18 +39,52 @@ const ContactPreviewDialog: React.FC<ContactPreviewDialogProps> = ({
 
       if (!response.ok) throw new Error("Failed to send emails");
 
-      // Wait for the response to complete
-      await response.text();
-      
-      setIsComplete(true);
-      // Update the email count in the dashboard
-      onEmailsSent(data.length);
-      setTimeout(() => {
-        setShowStreamingDialog(false);
-        onClose();
-      }, 2500);
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      if (!reader) throw new Error("No response stream");
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value);
+        const lines = chunk.split("\n").filter(Boolean);
+
+        for (const line of lines) {
+          try {
+            const cleanLine = line.replace(/^data: /, "").trim();
+            if (!cleanLine) continue;
+            
+            // Handle both JSON and plain text messages
+            let message;
+            try {
+              const parsed = JSON.parse(cleanLine);
+              message = parsed.message;
+            } catch {
+              // If not JSON, use the line as is
+              message = cleanLine;
+            }
+
+            if (message) {
+              if (message.includes("✓ Email sent to")) {
+                onEmailsSent(1);
+              }
+              if (message.includes("✓ All emails sent successfully")) {
+                setIsComplete(true);
+                setTimeout(() => {
+                  setShowStreamingDialog(false);
+                  onClose();
+                }, 2500);
+              }
+            }
+          } catch (e) {
+            console.warn("Stream parse error:", line);
+          }
+        }
+      }
     } catch (error: any) {
       console.error("Error sending emails:", error);
+      toast.error(error.message || "Failed to send emails");
     } finally {
       setIsSending(false);
     }

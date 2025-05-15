@@ -84,15 +84,17 @@ export default function DashboardPage() {
         throw new Error(error.detail || 'Failed to download contact list');
       }
 
-      const data = await response.json();
+      // Get the file as a blob
+      const blob = await response.blob();
       
       // Create a download link
       const downloadLink = document.createElement('a');
-      downloadLink.href = `${process.env.NEXT_PUBLIC_BACKEND_URL}/download-file?path=${encodeURIComponent(data.file_path)}`;
+      downloadLink.href = URL.createObjectURL(blob);
       downloadLink.download = 'contact_list.xlsx';
       document.body.appendChild(downloadLink);
       downloadLink.click();
       document.body.removeChild(downloadLink);
+      URL.revokeObjectURL(downloadLink.href);
       
       toast.success('Contact list downloaded successfully');
       

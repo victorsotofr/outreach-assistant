@@ -12,15 +12,28 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from openai import OpenAI
 import io
+import platform
 from db.config_db import get_user_templates, get_user_config
 
 # === PATH SETUP ===
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, ".."))
+ROOT_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, "..", ".."))
 load_dotenv(os.path.join(PROJECT_ROOT, ".env"))
 
+def get_downloads_path():
+    """Get the appropriate downloads path based on the environment."""
+    if platform.system() == "Linux" and os.path.exists("/opt/render"):
+        # We're in a containerized environment (like Render)
+        downloads_dir = os.path.join(ROOT_DIR, "downloads")
+        os.makedirs(downloads_dir, exist_ok=True)
+        return os.path.join(downloads_dir, "updated_contact_list.xlsx")
+    else:
+        # We're in a local environment
+        return os.path.expanduser("~/Downloads/updated_contact_list.xlsx")
+
 # === DATA PATHS ===
-UPDATED_LIST_PATH = os.path.expanduser("~/Downloads/updated_contact_list.xlsx")
+UPDATED_LIST_PATH = get_downloads_path()
 SENT_EMAILS_PATH = os.path.expanduser("~/Downloads/sent_emails.json")
 
 def get_openai_client(email):
@@ -61,15 +74,15 @@ def get_smtp_config(email):
     if not config:
         raise ValueError("No configuration found for user")
     
-    required_fields = ['smtp_username', 'smtp_password', 'smtp_server', 'smtp_port']
+    required_fields = ['smtp_user', 'smtp_pass', 'smtp_server', 'smtp_port']
     missing_fields = [field for field in required_fields if not config.get(field)]
     
     if missing_fields:
         raise ValueError(f"Missing SMTP configuration: {', '.join(missing_fields)}")
     
     return {
-        'username': config['smtp_username'],
-        'password': config['smtp_password'],
+        'username': config['smtp_user'],
+        'password': config['smtp_pass'],
         'server': config['smtp_server'],
         'port': int(config['smtp_port'])
     }
@@ -143,15 +156,46 @@ Respond ONLY in JSON format like:
   "description": "..."
 }}
 """
-    response = client.chat.completions.create(
-        model="gpt-4",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.5,
-    )
-    raw_text = response.choices[0].message.content
-    cleaned = re.sub(r"^```(?:json)?", "", raw_text.strip())
-    cleaned = re.sub(r"```$", "", cleaned.strip())
-    return json.loads(cleaned)
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.5,
+        )
+        raw_text = response.choices[0].message.content
+        cleaned = re.sub(r"^```(?:json)?", "", raw_text.strip())
+        cleaned = re.sub(r"```$", "", cleaned.strip())
+        result = json.loads(cleaned)
+        
+        # Validate required fields
+        required_fields = ["language", "civility", "hq", "ftes", "description"]
+        for field in required_fields:
+            if field not in result:
+                result[field] = ""
+        
+        # Ensure language is either "French" or "English"
+        if result["language"] not in ["French", "English"]:
+            result["language"] = "English"
+        
+        # Ensure civility is appropriate for the language
+        if result["language"] == "French":
+            if result["civility"] not in ["Monsieur", "Madame"]:
+                result["civility"] = "Monsieur"
+        else:
+            if result["civility"] not in ["Mr", "Ms"]:
+                result["civility"] = "Mr"
+        
+        return result
+    except Exception as e:
+        print(f"Error enriching contact: {str(e)}")
+        # Return default values if enrichment fails
+        return {
+            "language": "English",
+            "civility": "Mr",
+            "hq": "",
+            "ftes": "",
+            "description": ""
+        }
 
 def get_school(education):
     if pd.isna(education):
@@ -175,12 +219,18 @@ def send_email(to_email, subject, body, smtp_config):
     msg.attach(MIMEText(body, "html"))
     
     try:
+        print(f"Attempting to connect to SMTP server: {smtp_config['server']}:{smtp_config['port']}")
         with smtplib.SMTP(smtp_config['server'], smtp_config['port']) as server:
+            print("Starting TLS connection...")
             server.starttls()
+            print(f"Attempting to login with username: {smtp_config['username']}")
             server.login(smtp_config['username'], smtp_config['password'])
+            print(f"Sending email to: {to_email}")
             server.send_message(msg)
+            print(f"Email sent successfully to: {to_email}")
             return True
     except Exception as e:
+        print(f"Error sending email to {to_email}: {str(e)}")
         return str(e)
 
 def run_from_ui(sheet_url, preview_only=False, email=None):
@@ -194,11 +244,16 @@ def run_from_ui(sheet_url, preview_only=False, email=None):
 
     try:
         # Get templates, SMTP config, and OpenAI client from database
+        print(f"Getting templates for user: {email}")
         template_fr, template_en = get_templates(email)
+        print(f"Getting SMTP config for user: {email}")
         smtp_config = get_smtp_config(email)
+        print(f"SMTP config: {smtp_config}")
+        print(f"Getting OpenAI client for user: {email}")
         openai_client = get_openai_client(email)
         
         # Read from Google Sheet
+        print(f"Reading data from Google Sheet: {sheet_url}")
         df = get_sheet_data(sheet_url)
         if df.empty:
             yield json.dumps({"type": "error", "message": "No data found in the Google Sheet"})
@@ -226,8 +281,11 @@ def run_from_ui(sheet_url, preview_only=False, email=None):
         # Create a single SMTP connection for all emails
         server = None
         try:
+            print(f"Creating SMTP connection to {smtp_config['server']}:{smtp_config['port']}")
             server = smtplib.SMTP(smtp_config['server'], smtp_config['port'])
+            print("Starting TLS connection...")
             server.starttls()
+            print(f"Logging in with username: {smtp_config['username']}")
             server.login(smtp_config['username'], smtp_config['password'])
             yield json.dumps({"type": "status", "message": "✓ SMTP connection established"})
 
@@ -242,6 +300,7 @@ def run_from_ui(sheet_url, preview_only=False, email=None):
                 yield json.dumps({"type": "status", "message": msg})
 
                 try:
+                    print(f"Enriching contact data for: {email}")
                     enriched = enrich_contact(row, openai_client)
                     civility = enriched["civility"]
                     language = enriched["language"]
@@ -273,12 +332,15 @@ def run_from_ui(sheet_url, preview_only=False, email=None):
                     try:
                         # Verify SMTP connection is still active
                         if not server.noop()[0] == 250:
+                            print("SMTP connection lost, reconnecting...")
                             yield json.dumps({"type": "error", "message": "SMTP connection lost, reconnecting..."})
                             server = smtplib.SMTP(smtp_config['server'], smtp_config['port'])
                             server.starttls()
                             server.login(smtp_config['username'], smtp_config['password'])
 
+                        print(f"Sending email to: {email}")
                         server.send_message(msg)
+                        print(f"Email sent successfully to: {email}")
                         enriched_rows.append({
                             "company": row["company"],
                             "account_owner": "",
@@ -299,22 +361,36 @@ def run_from_ui(sheet_url, preview_only=False, email=None):
                         })
 
                         yield json.dumps({"type": "status", "message": f"✓ Email sent to {email}"})
-                        time.sleep(2)
+                        time.sleep(2)  # Add a small delay between emails
                     except Exception as e:
+                        print(f"Error sending email to {email}: {str(e)}")
                         yield json.dumps({"type": "error", "message": f"Failed to send email to {email}: {str(e)}"})
+                        # Try to reconnect if there's an error
+                        try:
+                            server = smtplib.SMTP(smtp_config['server'], smtp_config['port'])
+                            server.starttls()
+                            server.login(smtp_config['username'], smtp_config['password'])
+                            yield json.dumps({"type": "status", "message": "✓ SMTP connection reestablished"})
+                        except Exception as reconnect_error:
+                            print(f"Failed to reconnect to SMTP server: {str(reconnect_error)}")
+                            yield json.dumps({"type": "error", "message": "Failed to reconnect to SMTP server. Stopping email sending."})
+                            break
                         continue
 
                 except Exception as e:
+                    print(f"Error processing {email}: {str(e)}")
                     yield json.dumps({"type": "error", "message": f"Error processing {email}: {str(e)}"})
                     continue
 
         except Exception as e:
+            print(f"SMTP connection error: {str(e)}")
             yield json.dumps({"type": "error", "message": f"SMTP connection error: {str(e)}"})
             return
         finally:
             if server:
                 try:
                     server.quit()
+                    print("SMTP connection closed")
                     yield json.dumps({"type": "status", "message": "✓ SMTP connection closed"})
                 except:
                     pass
@@ -333,8 +409,10 @@ def run_from_ui(sheet_url, preview_only=False, email=None):
 
         grouped_df[ordered_cols].to_excel(UPDATED_LIST_PATH, index=False, engine='openpyxl')
         yield json.dumps({"type": "status", "message": f"→ Updated contact list saved to: {UPDATED_LIST_PATH}"})
+        yield json.dumps({"type": "status", "message": "✓ All emails sent successfully"})
 
     except Exception as e:
+        print(f"Error in run_from_ui: {str(e)}")
         yield json.dumps({"type": "error", "message": str(e)})
 
 if __name__ == "__main__":

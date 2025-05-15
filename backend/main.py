@@ -338,11 +338,12 @@ async def download_contacts(request: Request):
         if not os.path.exists(DOWNLOADS_PATH):
             raise HTTPException(status_code=500, detail="Failed to create contact list file")
 
-        # Return the file path
-        return {
-            "message": "Contacts downloaded successfully",
-            "file_path": DOWNLOADS_PATH
-        }
+        # Return the file directly
+        return FileResponse(
+            DOWNLOADS_PATH,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            filename="contact_list.xlsx"
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -397,7 +398,9 @@ async def send_emails(request: Request):
         async def generate():
             try:
                 for message in run_from_ui(
-                        sheet_url, preview_only=preview_only):
+                        sheet_url, 
+                        preview_only=preview_only,
+                        email=email):  # Pass the user's email
                     # Clean any NaN values from the message
                     if isinstance(message, dict):
                         message = {k: (None if pd.isna(v) else v)
