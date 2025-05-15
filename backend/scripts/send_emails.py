@@ -46,11 +46,32 @@ def get_openai_client(email):
         raise ValueError("OpenAI API key not configured")
     
     # Create client with API key - using the correct initialization for v0.28.1
-    openai.api_key = config['openai_api_key']
-    # Set base URL if provided
-    if config.get('openai_api_base'):
-        openai.api_base = config['openai_api_base']
-    return openai
+    try:
+        # The API key should already be decrypted by get_user_config
+        api_key = config['openai_api_key']
+        if not api_key or api_key.strip() == "":
+            raise ValueError("OpenAI API key is empty")
+        
+        openai.api_key = api_key
+        # Set base URL if provided
+        if config.get('openai_api_base'):
+            openai.api_base = config['openai_api_base']
+        
+        # Test the API key with a simple request
+        try:
+            openai.Completion.create(
+                model="gpt-4",
+                prompt="test",
+                max_tokens=1
+            )
+        except Exception as e:
+            print(f"OpenAI API test failed: {str(e)}")
+            raise ValueError(f"Invalid OpenAI API key: {str(e)}")
+        
+        return openai
+    except Exception as e:
+        print(f"Error initializing OpenAI client: {str(e)}")
+        raise ValueError(f"Failed to initialize OpenAI client: {str(e)}")
 
 def get_templates(email):
     """Get templates from the database for the given user."""

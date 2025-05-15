@@ -87,7 +87,7 @@ const ContactPreviewDialog: React.FC<ContactPreviewDialogProps> = ({
                 toast.success(message);
               } else if (message.includes("✓ All emails sent successfully")) {
                 setIsComplete(true);
-                toast.success(message);
+                toast.success("✓ All emails sent successfully");
                 setIsSending(false);
 
                 // Download the updated contact list
@@ -115,6 +115,7 @@ const ContactPreviewDialog: React.FC<ContactPreviewDialogProps> = ({
                   a.click();
                   window.URL.revokeObjectURL(url);
                   document.body.removeChild(a);
+                  toast.success("✓ Updated contact list downloaded");
                 } catch (downloadError) {
                   console.error("Error downloading updated contacts:", downloadError);
                   toast.error("Failed to download updated contacts");
@@ -124,6 +125,9 @@ const ContactPreviewDialog: React.FC<ContactPreviewDialogProps> = ({
                   setShowStreamingDialog(false);
                   onClose();
                 }, 2000);
+              } else if (message.includes("→ Updated contact list saved to:")) {
+                // Skip this message as we'll show a better one after download
+                continue;
               } else {
                 toast(message);
               }

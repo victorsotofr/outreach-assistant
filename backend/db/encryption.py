@@ -20,27 +20,20 @@ class Encryption:
             except Exception as e:
                 print(f"Warning: Invalid ENCRYPTION_KEY in environment: {e}")
         
-        # Fall back to file-based key
-        key_path = Path(__file__).parent / '.encryption_key'
-        
-        if key_path.exists():
-            with open(key_path, 'rb') as f:
-                return f.read()
-        
-        # Generate a new key
+        # If no valid key in environment, generate a new one
         key = Fernet.generate_key()
-        
-        # Save the key
-        with open(key_path, 'wb') as f:
-            f.write(key)
-        
+        print("Warning: No ENCRYPTION_KEY found in environment. Generated a new key.")
         return key
 
     def encrypt(self, data: str) -> str:
         """Encrypt a string and return the encrypted string."""
         if not data:
             return data
-        return self.fernet.encrypt(data.encode()).decode()
+        try:
+            return self.fernet.encrypt(data.encode()).decode()
+        except Exception as e:
+            print(f"Error encrypting data: {str(e)}")
+            raise ValueError(f"Failed to encrypt data: {str(e)}")
 
     def decrypt(self, encrypted_data: str) -> str:
         """Decrypt an encrypted string and return the original string."""
@@ -49,6 +42,7 @@ class Encryption:
         try:
             return self.fernet.decrypt(encrypted_data.encode()).decode()
         except Exception as e:
+            print(f"Error decrypting data: {str(e)}")
             raise ValueError(f"Failed to decrypt data: {str(e)}")
 
 # Create a singleton instance
