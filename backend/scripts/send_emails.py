@@ -37,16 +37,18 @@ UPDATED_LIST_PATH = get_downloads_path()
 SENT_EMAILS_PATH = os.path.expanduser("~/Downloads/sent_emails.json")
 
 def get_openai_client(email):
-    """Get OpenAI client with API key from user settings."""
     config = get_user_config(email)
     if not config:
         raise ValueError("No configuration found for user")
-    
+
     if not config.get('openai_api_key'):
         raise ValueError("OpenAI API key not configured")
-    
-    # Create client with API key
-    return OpenAI(api_key=config['openai_api_key'])
+
+    # Explicitly pass only supported keys
+    return OpenAI(
+        api_key=config['openai_api_key'],
+        base_url="https://api.openai.com/v1"
+    )
 
 def get_templates(email):
     """Get templates from the database for the given user."""
