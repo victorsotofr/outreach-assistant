@@ -476,9 +476,10 @@ async def process_image(
         
         # Log the API endpoint and headers (excluding sensitive data)
         headers = {
-            "Api-Key": config.uiform_api_key
+            "Authorization": "Bearer [REDACTED]",
+            "Content-Type": "multipart/form-data"
         }
-        logger.info(f"Making request to {api_url}")
+        logger.info(f"Making request to {api_url} with headers: {headers}")
         
         # Prepare the file for upload
         files = {
@@ -488,7 +489,9 @@ async def process_image(
         # Process with UiForm API
         response = session.post(
             api_url,
-            headers=headers,
+            headers={
+                "Authorization": f"Bearer {config.uiform_api_key}"
+            },
             files=files,
             timeout=30  # Add timeout
         )
@@ -496,13 +499,7 @@ async def process_image(
         logger.info(f"API Response status code: {response.status_code}")
         
         if response.status_code != 200:
-            error_detail = f"UiForm API error: Status {response.status_code}"
-            try:
-                error_response = response.json()
-                error_detail += f", Response: {error_response}"
-            except:
-                error_detail += f", Response: {response.text}"
-            
+            error_detail = f"UiForm API error: Status {response.status_code}, Response: {response.text}"
             logger.error(error_detail)
             raise HTTPException(
                 status_code=response.status_code,
