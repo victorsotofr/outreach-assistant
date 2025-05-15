@@ -197,7 +197,22 @@ def get_user_config(email: str):
             """, (email,))
             config = cur.fetchone()
             if config:
-                return decrypt_sensitive_fields(dict(config))
+                decrypted_config = decrypt_sensitive_fields(dict(config))
+                
+                # Clean up legacy keys like "proxies"
+                if "proxies" in decrypted_config:
+                    print(f"[CLEANUP] Removing 'proxies' key for {email}")
+                    del decrypted_config["proxies"]
+                    # Save the cleaned config back to the DB
+                    encrypted_config = encrypt_sensitive_fields(decrypted_config)
+                    cur.execute("""
+                        UPDATE user_configs 
+                        SET openai_api_key = %s
+                        WHERE email = %s
+                    """, (encrypted_config['openai_api_key'], email))
+                    conn.commit()
+                
+                return decrypted_config
             return {}
 
 def get_user_templates(email: str):
