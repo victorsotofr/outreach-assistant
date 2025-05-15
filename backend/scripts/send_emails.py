@@ -10,7 +10,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from openai import OpenAI
+import openai
 import io
 import platform
 from db.config_db import get_user_templates, get_user_config
@@ -45,8 +45,9 @@ def get_openai_client(email):
     if not config.get('openai_api_key'):
         raise ValueError("OpenAI API key not configured")
     
-    # Create client with API key - using the correct initialization for v1.25.1
-    return OpenAI(api_key=config['openai_api_key'])
+    # Create client with API key - using the correct initialization for v0.28.1
+    openai.api_key = config['openai_api_key']
+    return openai
 
 def get_templates(email):
     """Get templates from the database for the given user."""
@@ -200,12 +201,13 @@ Respond ONLY in JSON format like:
 }}
 """
     try:
-        response = client.chat.completions.create(
+        response = client.Completion.create(
             model="gpt-4",
-            messages=[{"role": "user", "content": prompt}],
+            prompt=prompt,
             temperature=0.5,
+            max_tokens=500
         )
-        raw_text = response.choices[0].message.content
+        raw_text = response.choices[0].text
         cleaned = re.sub(r"^```(?:json)?", "", raw_text.strip())
         cleaned = re.sub(r"```$", "", cleaned.strip())
         result = json.loads(cleaned)
