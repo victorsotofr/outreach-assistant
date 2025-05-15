@@ -115,21 +115,15 @@ const ContactPreviewDialog: React.FC<ContactPreviewDialogProps> = ({
               } else if (message.includes("✓ Email sent to")) {
                 onEmailsSent(1);
                 toast.success(message);
-              } else if (message.includes("→ Updated contact list saved to:")) {
-                // Trigger download when we get the update confirmation
-                handleDownload();
               } else if (message.includes("✓ All emails sent successfully")) {
                 setIsComplete(true);
                 toast.success("✓ All emails sent successfully");
                 setIsSending(false);
-                
-                // Ensure dialog closes reliably
                 setShowStreamingDialog(false);
-                setTimeout(() => {
-                  onClose();
-                }, 1500);
+                onClose();
               } else {
-                toast(message);
+                // Just log other messages without showing toasts
+                console.log(`[${type}] ${message}`);
               }
             }
           } catch (e) {
