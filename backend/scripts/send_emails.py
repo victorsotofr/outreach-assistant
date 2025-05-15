@@ -127,22 +127,46 @@ def get_smtp_config(email):
     }
     print(f"SMTP config: {masked_config}")
     
-    # Test SMTP connection before returning config
-    try:
-        with smtplib.SMTP(smtp_server, smtp_port) as server:
-            server.starttls()
-            server.login(smtp_user, smtp_pass)
-            print("SMTP connection test successful")
-    except Exception as e:
-        print(f"SMTP connection test failed: {str(e)}")
-        raise ValueError(f"SMTP authentication failed: {str(e)}")
+    # Try different SMTP connection methods
+    connection_methods = [
+        # Try SSL/TLS from the start (port 465)
+        lambda: smtplib.SMTP_SSL(smtp_server, 465),
+        # Try STARTTLS (port 587)
+        lambda: smtplib.SMTP(smtp_server, smtp_port),
+        # Try default port with STARTTLS
+        lambda: smtplib.SMTP(smtp_server, 587)
+    ]
     
-    return {
-        'username': smtp_user,
-        'password': smtp_pass,
-        'server': smtp_server,
-        'port': smtp_port
-    }
+    last_error = None
+    for create_connection in connection_methods:
+        try:
+            print(f"Trying SMTP connection method: {create_connection.__name__}")
+            with create_connection() as server:
+                if isinstance(server, smtplib.SMTP):
+                    print("Starting TLS connection...")
+                    server.starttls()
+                
+                print(f"Attempting login with username: {smtp_user}")
+                server.login(smtp_user, smtp_pass)
+                print("SMTP connection test successful")
+                
+                # If we get here, the connection worked
+                return {
+                    'username': smtp_user,
+                    'password': smtp_pass,
+                    'server': smtp_server,
+                    'port': smtp_port,
+                    'use_ssl': isinstance(server, smtplib.SMTP_SSL)
+                }
+        except Exception as e:
+            print(f"SMTP connection attempt failed: {str(e)}")
+            last_error = e
+            continue
+    
+    # If we get here, all connection attempts failed
+    error_msg = f"All SMTP connection attempts failed. Last error: {str(last_error)}"
+    print(error_msg)
+    raise ValueError(error_msg)
 
 def load_sent_emails():
     if os.path.exists(SENT_EMAILS_PATH):
@@ -281,15 +305,22 @@ def send_email(to_email, subject, body, smtp_config, use_cc=False):
     
     try:
         print(f"Attempting to connect to SMTP server: {smtp_config['server']}:{smtp_config['port']}")
-        with smtplib.SMTP(smtp_config['server'], smtp_config['port']) as server:
+        
+        # Use the appropriate connection method based on the configuration
+        if smtp_config.get('use_ssl', False):
+            server = smtplib.SMTP_SSL(smtp_config['server'], smtp_config['port'])
+        else:
+            server = smtplib.SMTP(smtp_config['server'], smtp_config['port'])
             print("Starting TLS connection...")
             server.starttls()
-            print(f"Attempting to login with username: {smtp_config['username']}")
-            server.login(smtp_config['username'], smtp_config['password'])
-            print(f"Sending email to: {to_email}")
-            server.send_message(msg)
-            print(f"Email sent successfully to: {to_email}")
-            return True
+        
+        print(f"Attempting to login with username: {smtp_config['username']}")
+        server.login(smtp_config['username'], smtp_config['password'])
+        print(f"Sending email to: {to_email}")
+        server.send_message(msg)
+        print(f"Email sent successfully to: {to_email}")
+        server.quit()
+        return True
     except Exception as e:
         print(f"Error sending email to {to_email}: {str(e)}")
         return str(e)
