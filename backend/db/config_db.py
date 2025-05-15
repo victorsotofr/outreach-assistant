@@ -225,7 +225,21 @@ def get_user_config(email: str):
                 for field in SENSITIVE_FIELDS:
                     if field in decrypted_config and decrypted_config[field]:
                         decrypted_config[field] = '********'
-                
+
+                # Optional: enforce a strict set of allowed keys
+                allowed_keys = {
+                    "google_sheet_url",
+                    "openai_api_key",
+                    "smtp_pass",
+                    "smtp_port",
+                    "smtp_server",
+                    "smtp_user",
+                    "uiform_api_key",
+                    "watched_file_types",
+                    "uiform_api_endpoint"
+                }
+                decrypted_config = {k: v for k, v in decrypted_config.items() if k in allowed_keys}
+
                 return decrypted_config
             return {}
 
