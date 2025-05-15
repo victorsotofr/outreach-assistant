@@ -191,7 +191,7 @@ export default function Settings() {
                     type="password"
                     value={uiFormKey}
                     onChange={(e) => setUiFormKey(e.target.value)}
-                    placeholder="uf-..."
+                    placeholder="sk_uiform-..."
                     className="flex-1"
                   />
                   <Button

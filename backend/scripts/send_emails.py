@@ -57,11 +57,11 @@ def get_openai_client(email):
         if config.get('openai_api_base'):
             openai.api_base = config['openai_api_base']
         
-        # Test the API key with a simple request
+        # Test the API key with a simple request using chat completions
         try:
-            openai.Completion.create(
+            openai.ChatCompletion.create(
                 model="gpt-4",
-                prompt="test",
+                messages=[{"role": "user", "content": "test"}],
                 max_tokens=1
             )
         except Exception as e:
@@ -259,13 +259,13 @@ Respond ONLY in JSON format like:
 }}
 """
     try:
-        response = client.Completion.create(
+        response = client.ChatCompletion.create(
             model="gpt-4",
-            prompt=prompt,
+            messages=[{"role": "user", "content": prompt}],
             temperature=0.5,
             max_tokens=500
         )
-        raw_text = response.choices[0].text
+        raw_text = response.choices[0].message.content
         cleaned = re.sub(r"^```(?:json)?", "", raw_text.strip())
         cleaned = re.sub(r"```$", "", cleaned.strip())
         result = json.loads(cleaned)
