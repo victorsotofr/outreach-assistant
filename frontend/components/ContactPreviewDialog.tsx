@@ -92,10 +92,14 @@ const ContactPreviewDialog: React.FC<ContactPreviewDialogProps> = ({
 
                 // Download the updated contact list
                 try {
-                  const downloadResponse = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/download-updated-contacts`, {
+                  const downloadResponse = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/download-contacts`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ email }),
+                    body: JSON.stringify({
+                      email,
+                      sheet_url: sheetUrl,
+                      action: "download"
+                    }),
                   });
 
                   if (!downloadResponse.ok) {
@@ -106,7 +110,7 @@ const ContactPreviewDialog: React.FC<ContactPreviewDialogProps> = ({
                   const url = window.URL.createObjectURL(blob);
                   const a = document.createElement("a");
                   a.href = url;
-                  a.download = "updated_contacts.csv";
+                  a.download = "updated_contacts.xlsx";
                   document.body.appendChild(a);
                   a.click();
                   window.URL.revokeObjectURL(url);

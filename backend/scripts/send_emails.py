@@ -47,9 +47,9 @@ def get_openai_client(email):
     
     # Create client with API key - using the correct initialization for v0.28.1
     openai.api_key = config['openai_api_key']
-    # Remove any proxy settings if they exist
-    if hasattr(openai, 'proxy'):
-        delattr(openai, 'proxy')
+    # Set base URL if provided
+    if config.get('openai_api_base'):
+        openai.api_base = config['openai_api_base']
     return openai
 
 def get_templates(email):
