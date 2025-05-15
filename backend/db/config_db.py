@@ -197,6 +197,7 @@ def get_user_config(email: str):
             """, (email,))
             config = cur.fetchone()
             if config:
+                # Convert to dict and decrypt sensitive fields
                 decrypted_config = decrypt_sensitive_fields(dict(config))
                 
                 # Clean up legacy keys like "proxies"
@@ -221,11 +222,6 @@ def get_user_config(email: str):
                     ))
                     conn.commit()
                 
-                # Mask sensitive fields in the returned config
-                for field in SENSITIVE_FIELDS:
-                    if field in decrypted_config and decrypted_config[field]:
-                        decrypted_config[field] = '********'
-
                 # Optional: enforce a strict set of allowed keys
                 allowed_keys = {
                     "google_sheet_url",
