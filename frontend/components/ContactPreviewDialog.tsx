@@ -119,15 +119,16 @@ const ContactPreviewDialog: React.FC<ContactPreviewDialogProps> = ({
                 setIsComplete(true);
                 toast.success("✓ All emails sent successfully");
                 setIsSending(false);
-                
+
                 // Automatically download the enriched contact list
                 await handleDownload();
-                
-                // Close the dialog after a short delay
+
+                // Ensure dialog closes reliably
+                setShowStreamingDialog(false);
                 setTimeout(() => {
-                  setShowStreamingDialog(false);
                   onClose();
-                }, 2000);
+                }, 1500);
+
               } else if (message.includes("→ Updated contact list saved to:")) {
                 // Skip this message as we'll show a better one after download
                 continue;

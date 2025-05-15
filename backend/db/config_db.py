@@ -168,7 +168,6 @@ def decrypt_sensitive_fields(config: Dict[str, Any]) -> Dict[str, Any]:
     sensitive_fields = {
         'openai_api_key',
         'smtp_pass',
-        'smtp_user',
         'uiform_api_key',
         'uiform_api_endpoint'
     }
