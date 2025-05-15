@@ -10,6 +10,7 @@ from sqlalchemy import create_engine, Column, String, Integer, Boolean, DateTime
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 from datetime import datetime
+from typing import Optional, Dict, Any
 
 # Get the project root directory
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -162,11 +163,26 @@ def encrypt_sensitive_fields(config: dict) -> dict:
             encrypted_config[field] = encryption.encrypt(encrypted_config[field])
     return encrypted_config
 
-def decrypt_sensitive_fields(config: dict) -> dict:
+def decrypt_sensitive_fields(config: Dict[str, Any]) -> Dict[str, Any]:
+    """Decrypt sensitive fields in the configuration."""
+    sensitive_fields = {
+        'openai_api_key',
+        'smtp_pass',
+        'uiform_api_key'
+    }
+    
     decrypted_config = config.copy()
-    for field in SENSITIVE_FIELDS:
+    for field in sensitive_fields:
         if field in decrypted_config and decrypted_config[field]:
-            decrypted_config[field] = encryption.decrypt(decrypted_config[field])
+            try:
+                decrypted_value = encryption.decrypt(decrypted_config[field])
+                if decrypted_value:
+                    decrypted_config[field] = decrypted_value
+            except Exception as e:
+                print(f"Error decrypting {field}: {str(e)}")
+                # Don't raise the error, just keep the encrypted value
+                continue
+    
     return decrypted_config
 
 def save_user_config(email: str, config: dict):
@@ -189,55 +205,35 @@ def save_user_config(email: str, config: dict):
             cur.execute(query, [email] + values)
             conn.commit()
 
-def get_user_config(email: str):
-    with get_db_connection() as conn:
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute("""
-                SELECT * FROM user_configs WHERE email = %s
-            """, (email,))
-            config = cur.fetchone()
-            if config:
-                # Convert to dict and decrypt sensitive fields
-                decrypted_config = decrypt_sensitive_fields(dict(config))
-                
-                # Clean up legacy keys like "proxies"
-                if "proxies" in decrypted_config:
-                    print(f"[CLEANUP] Removing 'proxies' key for {email}")
-                    del decrypted_config["proxies"]
-                    # Save the cleaned config back to the DB
-                    encrypted_config = encrypt_sensitive_fields(decrypted_config)
-                    cur.execute("""
-                        UPDATE user_configs 
-                        SET openai_api_key = %s,
-                            smtp_pass = %s,
-                            uiform_api_key = %s,
-                            uiform_api_endpoint = %s
-                        WHERE email = %s
-                    """, (
-                        encrypted_config.get('openai_api_key'),
-                        encrypted_config.get('smtp_pass'),
-                        encrypted_config.get('uiform_api_key'),
-                        encrypted_config.get('uiform_api_endpoint'),
-                        email
-                    ))
-                    conn.commit()
-                
-                # Optional: enforce a strict set of allowed keys
-                allowed_keys = {
-                    "google_sheet_url",
-                    "openai_api_key",
-                    "smtp_pass",
-                    "smtp_port",
-                    "smtp_server",
-                    "smtp_user",
-                    "uiform_api_key",
-                    "watched_file_types",
-                    "uiform_api_endpoint"
-                }
-                decrypted_config = {k: v for k, v in decrypted_config.items() if k in allowed_keys}
-
-                return decrypted_config
-            return {}
+def get_user_config(email: str) -> Optional[Dict[str, Any]]:
+    """Get user configuration from the database."""
+    try:
+        # Get the user's configuration
+        config = db.get_user_config(email)
+        if not config:
+            return None
+        
+        # Convert to dict and decrypt sensitive fields
+        config_dict = dict(config)
+        config_dict = decrypt_sensitive_fields(config_dict)
+        
+        # Clean up legacy keys
+        if 'proxies' in config_dict:
+            del config_dict['proxies']
+            db.update_user_config(email, config_dict)
+        
+        # Enforce allowed keys
+        allowed_keys = {
+            'smtp_user', 'smtp_pass', 'smtp_server', 'smtp_port',
+            'openai_api_key', 'openai_api_base', 'openai_api_type',
+            'openai_api_version', 'openai_api_deployment'
+        }
+        
+        # Only return allowed keys that exist in the config
+        return {k: v for k, v in config_dict.items() if k in allowed_keys}
+    except Exception as e:
+        print(f"Error getting user config: {str(e)}")
+        return None
 
 def get_user_templates(email: str):
     with get_db_connection() as conn:
