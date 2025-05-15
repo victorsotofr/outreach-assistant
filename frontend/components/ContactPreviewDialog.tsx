@@ -139,7 +139,7 @@ const ContactPreviewDialog: React.FC<ContactPreviewDialogProps> = ({
               checked={useCc}
               onCheckedChange={(checked) => setUseCc(checked as boolean)}
             />
-            <Label htmlFor="use-cc">Cc</Label>
+            <Label htmlFor="use-cc">Add me in Cc</Label>
           </div>
 
           <div className="max-h-[70vh] overflow-y-auto mb-4">
