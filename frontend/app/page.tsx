@@ -27,11 +27,21 @@ export default function Home() {
                 className="h-16 w-auto hover:opacity-90 transition-opacity duration-200"
               />
             </div>
-            <h1 className="text-5xl sm:text-6xl font-bold tracking-tight text-gray-900 leading-tight mb-4">
-              <span className="block text-black font-extrabold text-6xl sm:text-7xl mb-2">
-                Outreach Assistant
-              </span>
+            <h1 className="text-4xl font-bold text-center mb-4">
+              Everything You Need.<br />
+              Scale Your Outreach with Smart Automation.
             </h1>
+            
+            <div className="w-full max-w-4xl mx-auto mb-12">
+              <video 
+                className="w-full rounded-lg shadow-lg"
+                controls
+                poster="/uiform-logo.png"
+              >
+                <source src="/outreach-demo.mp4" type="video/mp4" />
+                Your browser does not support the video tag.
+              </video>
+            </div>
 
             <p className="mt-6 text-lg sm:text-xl text-gray-600 font-light tracking-wide">
               Take Your Outreach Further with UiForm
