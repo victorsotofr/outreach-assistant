@@ -376,7 +376,7 @@ export default function DashboardPage() {
               </div>
             </CardContent>
           </Card>
-
+          
           <Card>
             <CardContent className="p-6 space-y-4">
               <div className="flex items-center justify-between">
@@ -404,7 +404,7 @@ export default function DashboardPage() {
                     </div>
                   )}
                 </div>
-              </div>
+                      </div>
 
               {Object.keys(uploadProgress).length > 0 && (
                 <div className="mt-4 space-y-2">
