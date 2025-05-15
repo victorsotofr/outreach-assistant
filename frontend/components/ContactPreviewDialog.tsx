@@ -79,16 +79,47 @@ const ContactPreviewDialog: React.FC<ContactPreviewDialogProps> = ({
               
               if (type === "error") {
                 toast.error(message);
+                setIsSending(false);
+                setShowStreamingDialog(false);
+                return;
               } else if (message.includes("✓ Email sent to")) {
                 onEmailsSent(1);
                 toast.success(message);
               } else if (message.includes("✓ All emails sent successfully")) {
                 setIsComplete(true);
                 toast.success(message);
+                setIsSending(false);
+
+                // Download the updated contact list
+                try {
+                  const downloadResponse = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/download-updated-contacts`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ email }),
+                  });
+
+                  if (!downloadResponse.ok) {
+                    throw new Error("Failed to download updated contacts");
+                  }
+
+                  const blob = await downloadResponse.blob();
+                  const url = window.URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = "updated_contacts.csv";
+                  document.body.appendChild(a);
+                  a.click();
+                  window.URL.revokeObjectURL(url);
+                  document.body.removeChild(a);
+                } catch (downloadError) {
+                  console.error("Error downloading updated contacts:", downloadError);
+                  toast.error("Failed to download updated contacts");
+                }
+
                 setTimeout(() => {
                   setShowStreamingDialog(false);
                   onClose();
-                }, 2500);
+                }, 2000);
               } else {
                 toast(message);
               }
@@ -96,14 +127,17 @@ const ContactPreviewDialog: React.FC<ContactPreviewDialogProps> = ({
           } catch (e) {
             console.error("Stream parse error:", e, line);
             toast.error("Error processing server response");
+            setIsSending(false);
+            setShowStreamingDialog(false);
+            return;
           }
         }
       }
     } catch (error: any) {
       console.error("Error sending emails:", error);
       toast.error(error.message || "Failed to send emails");
-    } finally {
       setIsSending(false);
+      setShowStreamingDialog(false);
     }
   };
 
