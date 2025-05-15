@@ -47,6 +47,9 @@ def get_openai_client(email):
     
     # Create client with API key - using the correct initialization for v0.28.1
     openai.api_key = config['openai_api_key']
+    # Remove any proxy settings if they exist
+    if hasattr(openai, 'proxy'):
+        delattr(openai, 'proxy')
     return openai
 
 def get_templates(email):
@@ -123,6 +126,16 @@ def get_smtp_config(email):
         'port': smtp_port
     }
     print(f"SMTP config: {masked_config}")
+    
+    # Test SMTP connection before returning config
+    try:
+        with smtplib.SMTP(smtp_server, smtp_port) as server:
+            server.starttls()
+            server.login(smtp_user, smtp_pass)
+            print("SMTP connection test successful")
+    except Exception as e:
+        print(f"SMTP connection test failed: {str(e)}")
+        raise ValueError(f"SMTP authentication failed: {str(e)}")
     
     return {
         'username': smtp_user,
