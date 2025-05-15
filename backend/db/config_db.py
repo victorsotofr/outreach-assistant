@@ -74,8 +74,6 @@ SENSITIVE_FIELDS = {
     "uiform_api_key",
     "uiform_api_endpoint",
     "smtp_pass",
-    "smtp_user",
-    "google_sheet_url", 
 }
 
 DEFAULT_TEMPLATE = {
