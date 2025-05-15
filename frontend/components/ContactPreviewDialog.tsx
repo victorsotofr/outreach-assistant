@@ -108,6 +108,7 @@ const ContactPreviewDialog: React.FC<ContactPreviewDialogProps> = ({
               console.log(`[${type}] ${message}`);
               
               if (type === "error") {
+                console.log("Error detected, closing dialogs");
                 toast.error(message);
                 setIsSending(false);
                 setShowStreamingDialog(false);
@@ -116,11 +117,22 @@ const ContactPreviewDialog: React.FC<ContactPreviewDialogProps> = ({
                 onEmailsSent(1);
                 toast.success(message);
               } else if (message.includes("✓ All emails sent successfully")) {
+                console.log("All emails sent, preparing to close dialogs");
                 setIsComplete(true);
                 toast.success("✓ All emails sent successfully");
+                
+                // Force state updates in sequence
                 setIsSending(false);
+                console.log("isSending set to false");
+                
                 setShowStreamingDialog(false);
-                onClose();
+                console.log("showStreamingDialog set to false");
+                
+                // Small delay to ensure state updates are processed
+                setTimeout(() => {
+                  console.log("Closing main dialog");
+                  onClose();
+                }, 100);
               } else {
                 // Just log other messages without showing toasts
                 console.log(`[${type}] ${message}`);
@@ -220,15 +232,18 @@ const ContactPreviewDialog: React.FC<ContactPreviewDialogProps> = ({
                   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>
                 )}
               </div>
-              {!isSending && (
-                <Button
-                  onClick={() => setShowStreamingDialog(false)}
-                  variant="outline"
-                  className="w-12 h-12 flex items-center justify-center bg-red-50 hover:bg-red-100 border-2 border-red-500 rounded-lg transition-colors"
-                >
-                  <span className="text-2xl text-red-600">✕</span>
-                </Button>
-              )}
+              <Button
+                onClick={() => {
+                  console.log("Manual close triggered");
+                  setIsSending(false);
+                  setShowStreamingDialog(false);
+                  onClose();
+                }}
+                variant="outline"
+                className="w-12 h-12 flex items-center justify-center bg-red-50 hover:bg-red-100 border-2 border-red-500 rounded-lg transition-colors"
+              >
+                <span className="text-2xl text-red-600">✕</span>
+              </Button>
             </div>
 
             <div className="bg-gray-50 rounded-lg p-4">
