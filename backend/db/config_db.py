@@ -208,29 +208,50 @@ def save_user_config(email: str, config: dict):
 def get_user_config(email: str) -> Optional[Dict[str, Any]]:
     """Get user configuration from the database."""
     try:
-        # Get the user's configuration
-        config = db.get_user_config(email)
-        if not config:
-            return None
-        
-        # Convert to dict and decrypt sensitive fields
-        config_dict = dict(config)
-        config_dict = decrypt_sensitive_fields(config_dict)
-        
-        # Clean up legacy keys
-        if 'proxies' in config_dict:
-            del config_dict['proxies']
-            db.update_user_config(email, config_dict)
-        
-        # Enforce allowed keys
-        allowed_keys = {
-            'smtp_user', 'smtp_pass', 'smtp_server', 'smtp_port',
-            'openai_api_key', 'openai_api_base', 'openai_api_type',
-            'openai_api_version', 'openai_api_deployment'
-        }
-        
-        # Only return allowed keys that exist in the config
-        return {k: v for k, v in config_dict.items() if k in allowed_keys}
+        with get_db_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute("""
+                    SELECT * FROM user_configs WHERE email = %s
+                """, (email,))
+                config = cur.fetchone()
+                if not config:
+                    return None
+                
+                # Convert to dict and decrypt sensitive fields
+                config_dict = dict(config)
+                config_dict = decrypt_sensitive_fields(config_dict)
+                
+                # Clean up legacy keys
+                if 'proxies' in config_dict:
+                    del config_dict['proxies']
+                    # Update the config without the proxies key
+                    encrypted_config = encrypt_sensitive_fields(config_dict)
+                    cur.execute("""
+                        UPDATE user_configs 
+                        SET openai_api_key = %s,
+                            smtp_pass = %s,
+                            uiform_api_key = %s,
+                            uiform_api_endpoint = %s,
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE email = %s
+                    """, (
+                        encrypted_config.get('openai_api_key'),
+                        encrypted_config.get('smtp_pass'),
+                        encrypted_config.get('uiform_api_key'),
+                        encrypted_config.get('uiform_api_endpoint'),
+                        email
+                    ))
+                    conn.commit()
+                
+                # Enforce allowed keys
+                allowed_keys = {
+                    'smtp_user', 'smtp_pass', 'smtp_server', 'smtp_port',
+                    'openai_api_key', 'openai_api_base', 'openai_api_type',
+                    'openai_api_version', 'openai_api_deployment'
+                }
+                
+                # Only return allowed keys that exist in the config
+                return {k: v for k, v in config_dict.items() if k in allowed_keys}
     except Exception as e:
         print(f"Error getting user config: {str(e)}")
         return None
