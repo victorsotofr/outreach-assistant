@@ -5,10 +5,23 @@ from datetime import datetime
 import sys
 import re
 import io
+import platform
 
 # === Load environment and paths ===
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-DOWNLOADS_PATH = os.path.expanduser("~/Downloads/contact_list.xlsx")
+
+def get_downloads_path():
+    """Get the appropriate downloads path based on the environment."""
+    if platform.system() == "Linux" and os.path.exists("/opt/render"):
+        # We're in a containerized environment (like Render)
+        downloads_dir = os.path.join(ROOT_DIR, "downloads")
+        os.makedirs(downloads_dir, exist_ok=True)
+        return os.path.join(downloads_dir, "contact_list.xlsx")
+    else:
+        # We're in a local environment
+        return os.path.expanduser("~/Downloads/contact_list.xlsx")
+
+DOWNLOADS_PATH = get_downloads_path()
 
 COLUMNS_TO_KEEP = ["first_name", "last_name", "email", "company", "role", "education", "location"]
 
@@ -46,8 +59,11 @@ def download_and_clean_sheet(sheet_url=None, confirm=True):
         print(f"❌ Missing columns in sheet: {missing}")
         return
 
+    # Ensure the directory exists
+    os.makedirs(os.path.dirname(DOWNLOADS_PATH), exist_ok=True)
+    
     df[COLUMNS_TO_KEEP].to_excel(DOWNLOADS_PATH, index=False, engine='openpyxl')
-    print(f"✓ Saved contact list to Downloads: {DOWNLOADS_PATH}")
+    print(f"✓ Saved contact list to: {DOWNLOADS_PATH}")
 
 def get_sheet_preview(sheet_url, rows=5):
     """Get a preview of the sheet data"""

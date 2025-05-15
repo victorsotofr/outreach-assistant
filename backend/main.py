@@ -8,7 +8,7 @@ from scripts import send_emails
 from fastapi import FastAPI, Request, UploadFile, File, Form, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from db.config_db import save_user_config, get_user_config, get_user_templates, save_template, delete_template, update_template, init_default_template, get_db, UserConfig
-from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.responses import StreamingResponse, JSONResponse, FileResponse
 import shutil
 from datetime import datetime
 import pandas as pd
@@ -331,10 +331,18 @@ async def download_contacts(request: Request):
         if action == "delete":
             delete_processed_files()
 
-        from scripts.download_contacts import download_and_clean_sheet
+        from scripts.download_contacts import download_and_clean_sheet, DOWNLOADS_PATH
         download_and_clean_sheet(sheet_url, confirm=False)
 
-        return {"message": "Contacts downloaded successfully"}
+        # Check if the file exists
+        if not os.path.exists(DOWNLOADS_PATH):
+            raise HTTPException(status_code=500, detail="Failed to create contact list file")
+
+        # Return the file path
+        return {
+            "message": "Contacts downloaded successfully",
+            "file_path": DOWNLOADS_PATH
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -567,6 +575,22 @@ async def process_image(
                 "action": "Please try again or contact support"
             }
         )
+
+
+@app.get("/download-file")
+async def download_file(path: str):
+    """Serve a file for download."""
+    try:
+        if not os.path.exists(path):
+            raise HTTPException(status_code=404, detail="File not found")
+        
+        return FileResponse(
+            path,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            filename="contact_list.xlsx"
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 if __name__ == "__main__":

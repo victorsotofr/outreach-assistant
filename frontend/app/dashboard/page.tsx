@@ -80,11 +80,20 @@ export default function DashboardPage() {
       });
       
       if (!response.ok) {
-        const error = await response.text();
-        throw new Error(error);
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to download contact list');
       }
 
       const data = await response.json();
+      
+      // Create a download link
+      const downloadLink = document.createElement('a');
+      downloadLink.href = `${process.env.NEXT_PUBLIC_BACKEND_URL}/download-file?path=${encodeURIComponent(data.file_path)}`;
+      downloadLink.download = 'contact_list.xlsx';
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      document.body.removeChild(downloadLink);
+      
       toast.success('Contact list downloaded successfully');
       
       // Update the contacts count after successful download
