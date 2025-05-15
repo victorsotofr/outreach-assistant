@@ -74,6 +74,8 @@ SENSITIVE_FIELDS = {
     "uiform_api_key",
     "uiform_api_endpoint",
     "smtp_pass",
+    "smtp_user",
+    "google_sheet_url", 
 }
 
 DEFAULT_TEMPLATE = {
@@ -168,16 +170,22 @@ def decrypt_sensitive_fields(config: Dict[str, Any]) -> Dict[str, Any]:
     sensitive_fields = {
         'openai_api_key',
         'smtp_pass',
-        'uiform_api_key'
+        'smtp_user',
+        'uiform_api_key',
+        'uiform_api_endpoint'
     }
     
     decrypted_config = config.copy()
     for field in sensitive_fields:
         if field in decrypted_config and decrypted_config[field]:
             try:
+                print(f"Attempting to decrypt {field}")  # Debug log
                 decrypted_value = encryption.decrypt(decrypted_config[field])
                 if decrypted_value:
                     decrypted_config[field] = decrypted_value
+                    print(f"Successfully decrypted {field}")  # Debug log
+                else:
+                    print(f"Decrypted value for {field} is empty")  # Debug log
             except Exception as e:
                 print(f"Error decrypting {field}: {str(e)}")
                 # Don't raise the error, just keep the encrypted value
@@ -187,71 +195,36 @@ def decrypt_sensitive_fields(config: Dict[str, Any]) -> Dict[str, Any]:
 
 def save_user_config(email: str, config: dict):
     encrypted_config = encrypt_sensitive_fields(config)
+    known_columns = {col.name for col in UserConfig.__table__.columns if col.name != "email"}
+    valid_fields = [k for k in encrypted_config if k in known_columns]
+    
+    if not valid_fields:
+        return
+
     with get_db_connection() as conn:
         with conn.cursor() as cur:
-            # Convert config dict to list of tuples for upsert
-            fields = list(encrypted_config.keys())
-            values = [encrypted_config[field] for field in fields]
-            placeholders = [f"%s" for _ in fields]
-            
-            # Build the upsert query
+            values = [encrypted_config[k] for k in valid_fields]
+            placeholders = ["%s"] * len(valid_fields)
             query = f"""
-                INSERT INTO user_configs (email, {', '.join(fields)})
+                INSERT INTO user_configs (email, {', '.join(valid_fields)})
                 VALUES (%s, {', '.join(placeholders)})
                 ON CONFLICT (email) DO UPDATE SET
-                {', '.join(f"{field} = EXCLUDED.{field}" for field in fields)},
+                {', '.join(f"{k} = EXCLUDED.{k}" for k in valid_fields)},
                 updated_at = CURRENT_TIMESTAMP
             """
             cur.execute(query, [email] + values)
             conn.commit()
 
 def get_user_config(email: str) -> Optional[Dict[str, Any]]:
-    """Get user configuration from the database."""
     try:
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                cur.execute("""
-                    SELECT * FROM user_configs WHERE email = %s
-                """, (email,))
+                cur.execute("SELECT * FROM user_configs WHERE email = %s", (email,))
                 config = cur.fetchone()
                 if not config:
                     return None
-                
-                # Convert to dict and decrypt sensitive fields
-                config_dict = dict(config)
-                config_dict = decrypt_sensitive_fields(config_dict)
-                
-                # Clean up legacy keys
-                if 'proxies' in config_dict:
-                    del config_dict['proxies']
-                    # Update the config without the proxies key
-                    encrypted_config = encrypt_sensitive_fields(config_dict)
-                    cur.execute("""
-                        UPDATE user_configs 
-                        SET openai_api_key = %s,
-                            smtp_pass = %s,
-                            uiform_api_key = %s,
-                            uiform_api_endpoint = %s,
-                            updated_at = CURRENT_TIMESTAMP
-                        WHERE email = %s
-                    """, (
-                        encrypted_config.get('openai_api_key'),
-                        encrypted_config.get('smtp_pass'),
-                        encrypted_config.get('uiform_api_key'),
-                        encrypted_config.get('uiform_api_endpoint'),
-                        email
-                    ))
-                    conn.commit()
-                
-                # Enforce allowed keys
-                allowed_keys = {
-                    'smtp_user', 'smtp_pass', 'smtp_server', 'smtp_port',
-                    'openai_api_key', 'openai_api_base', 'openai_api_type',
-                    'openai_api_version', 'openai_api_deployment'
-                }
-                
-                # Only return allowed keys that exist in the config
-                return {k: v for k, v in config_dict.items() if k in allowed_keys}
+                config_dict = decrypt_sensitive_fields(dict(config))
+                return config_dict
     except Exception as e:
         print(f"Error getting user config: {str(e)}")
         return None
