@@ -45,7 +45,10 @@ def get_openai_client(email):
     if not config.get('openai_api_key'):
         raise ValueError("OpenAI API key not configured")
     
-    return OpenAI(api_key=config['openai_api_key'])
+    return OpenAI(
+        api_key=config['openai_api_key'],
+        base_url="https://api.openai.com/v1"
+    )
 
 def get_templates(email):
     """Get templates from the database for the given user."""
