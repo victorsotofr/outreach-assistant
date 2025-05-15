@@ -377,49 +377,27 @@ def sheet_preview(url: str, rows: int = 5):
 
 @app.post("/send-emails")
 async def send_emails(request: Request):
-    """Send outreach emails and return status updates."""
     try:
         data = await request.json()
         email = data.get("email")
         sheet_url = data.get("sheet_url")
-        action = data.get("action")
         confirmed = data.get("confirmed", False)
-        preview_only = data.get("preview_only", False)
-
+        use_cc = data.get("use_cc", False)
+        
         if not email or not sheet_url:
-            raise HTTPException(status_code=400,
-                                detail="Email and sheet URL are required")
-
-        if action == "delete":
-            delete_processed_files()
-
-        from scripts.send_emails import run_from_ui
-
-        async def generate():
-            try:
-                for message in run_from_ui(
-                        sheet_url, 
-                        preview_only=preview_only,
-                        email=email):  # Pass the user's email
-                    # Clean any NaN values from the message
-                    if isinstance(message, dict):
-                        message = {k: (None if pd.isna(v) else v)
-                                   for k, v in message.items()}
-                    # Ensure we're sending a proper JSON string
-                    json_message = json.dumps(message)
-                    yield f"data: {json_message}\n\n"
-            except Exception as e:
-                error_message = {"error": True, "message": str(e)}
-                yield f"data: {json.dumps(error_message)}\n\n"
-
+            raise HTTPException(status_code=400, detail="Email and sheet URL are required")
+        
+        if not confirmed:
+            # Return preview data
+            return StreamingResponse(
+                send_emails.run_from_ui(sheet_url, preview_only=True, email=email),
+                media_type="text/event-stream"
+            )
+        
+        # Send emails
         return StreamingResponse(
-            generate(),
-            media_type="text/event-stream",
-            headers={
-                "Cache-Control": "no-cache",
-                "Connection": "keep-alive",
-                "X-Accel-Buffering": "no"
-            }
+            send_emails.run_from_ui(sheet_url, email=email, use_cc=use_cc),
+            media_type="text/event-stream"
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

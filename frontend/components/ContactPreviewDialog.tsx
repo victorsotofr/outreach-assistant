@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 
 interface ContactPreviewDialogProps {
   data: any[];
@@ -20,6 +22,7 @@ const ContactPreviewDialog: React.FC<ContactPreviewDialogProps> = ({
   const [isSending, setIsSending] = useState(false);
   const [showStreamingDialog, setShowStreamingDialog] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
+  const [useCc, setUseCc] = useState(false);
 
   const handleConfirm = async () => {
     setIsSending(true);
@@ -34,10 +37,14 @@ const ContactPreviewDialog: React.FC<ContactPreviewDialogProps> = ({
           email,
           sheet_url: sheetUrl,
           confirmed: true,
+          use_cc: useCc,
         }),
       });
 
-      if (!response.ok) throw new Error("Failed to send emails");
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || "Failed to send emails");
+      }
 
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
@@ -57,28 +64,38 @@ const ContactPreviewDialog: React.FC<ContactPreviewDialogProps> = ({
             
             // Handle both JSON and plain text messages
             let message;
+            let type = "status";
             try {
               const parsed = JSON.parse(cleanLine);
               message = parsed.message;
+              type = parsed.type || "status";
             } catch {
               // If not JSON, use the line as is
               message = cleanLine;
             }
 
             if (message) {
-              if (message.includes("✓ Email sent to")) {
+              console.log(`[${type}] ${message}`); // Add console logging
+              
+              if (type === "error") {
+                toast.error(message);
+              } else if (message.includes("✓ Email sent to")) {
                 onEmailsSent(1);
-              }
-              if (message.includes("✓ All emails sent successfully")) {
+                toast.success(message);
+              } else if (message.includes("✓ All emails sent successfully")) {
                 setIsComplete(true);
+                toast.success(message);
                 setTimeout(() => {
                   setShowStreamingDialog(false);
                   onClose();
                 }, 2500);
+              } else {
+                toast(message);
               }
             }
           } catch (e) {
-            console.warn("Stream parse error:", line);
+            console.error("Stream parse error:", e, line);
+            toast.error("Error processing server response");
           }
         }
       }
@@ -114,6 +131,15 @@ const ContactPreviewDialog: React.FC<ContactPreviewDialogProps> = ({
                 </Button>
               </div>
             )}
+          </div>
+
+          <div className="flex items-center space-x-2 mb-4">
+            <Checkbox
+              id="use-cc"
+              checked={useCc}
+              onCheckedChange={(checked) => setUseCc(checked as boolean)}
+            />
+            <Label htmlFor="use-cc">Cc</Label>
           </div>
 
           <div className="max-h-[70vh] overflow-y-auto mb-4">

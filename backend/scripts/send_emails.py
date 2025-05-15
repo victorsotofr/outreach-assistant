@@ -70,21 +70,54 @@ def get_templates(email):
 
 def get_smtp_config(email):
     """Get SMTP configuration from user settings."""
+    print(f"Getting SMTP configuration for user: {email}")
     config = get_user_config(email)
     if not config:
+        print("No configuration found for user")
         raise ValueError("No configuration found for user")
     
     required_fields = ['smtp_user', 'smtp_pass', 'smtp_server', 'smtp_port']
     missing_fields = [field for field in required_fields if not config.get(field)]
     
     if missing_fields:
+        print(f"Missing SMTP configuration fields: {missing_fields}")
         raise ValueError(f"Missing SMTP configuration: {', '.join(missing_fields)}")
     
+    # Validate SMTP server
+    smtp_server = config['smtp_server']
+    if not smtp_server or not isinstance(smtp_server, str):
+        print(f"Invalid SMTP server: {smtp_server}")
+        raise ValueError("Invalid SMTP server configuration")
+    
+    # Validate SMTP port
+    try:
+        smtp_port = int(config['smtp_port'])
+        if not (0 < smtp_port < 65536):
+            print(f"Invalid SMTP port: {smtp_port}")
+            raise ValueError("SMTP port must be between 1 and 65535")
+    except (ValueError, TypeError):
+        print(f"Invalid SMTP port: {config['smtp_port']}")
+        raise ValueError("Invalid SMTP port configuration")
+    
+    # Validate SMTP user
+    smtp_user = config['smtp_user']
+    if not smtp_user or not isinstance(smtp_user, str) or '@' not in smtp_user:
+        print(f"Invalid SMTP user: {smtp_user}")
+        raise ValueError("Invalid SMTP user configuration")
+    
+    # Validate SMTP password
+    smtp_pass = config['smtp_pass']
+    if not smtp_pass or not isinstance(smtp_pass, str):
+        print("Invalid SMTP password configuration")
+        raise ValueError("Invalid SMTP password configuration")
+    
+    print(f"SMTP configuration validated for server: {smtp_server}:{smtp_port}")
+    
     return {
-        'username': config['smtp_user'],
-        'password': config['smtp_pass'],
-        'server': config['smtp_server'],
-        'port': int(config['smtp_port'])
+        'username': smtp_user,
+        'password': smtp_pass,
+        'server': smtp_server,
+        'port': smtp_port
     }
 
 def load_sent_emails():
@@ -210,12 +243,15 @@ def fill_template(template, placeholders):
         template = template.replace(f"[{key.upper()}]", value)
     return template
 
-def send_email(to_email, subject, body, smtp_config):
+def send_email(to_email, subject, body, smtp_config, use_cc=False):
     msg = MIMEMultipart()
     msg["From"] = smtp_config['username']
     msg["To"] = to_email
     msg["Subject"] = subject
-    msg["Bcc"] = smtp_config['username']
+    if use_cc:
+        msg["Cc"] = smtp_config['username']
+    else:
+        msg["Bcc"] = smtp_config['username']
     msg.attach(MIMEText(body, "html"))
     
     try:
@@ -233,7 +269,7 @@ def send_email(to_email, subject, body, smtp_config):
         print(f"Error sending email to {to_email}: {str(e)}")
         return str(e)
 
-def run_from_ui(sheet_url, preview_only=False, email=None):
+def run_from_ui(sheet_url, preview_only=False, email=None, use_cc=False):
     if not sheet_url:
         yield json.dumps({"type": "error", "message": "Google Sheet URL is required"})
         return
@@ -326,7 +362,10 @@ def run_from_ui(sheet_url, preview_only=False, email=None):
                     msg["From"] = smtp_config['username']
                     msg["To"] = email
                     msg["Subject"] = subject
-                    msg["Bcc"] = smtp_config['username']
+                    if use_cc:
+                        msg["Cc"] = smtp_config['username']
+                    else:
+                        msg["Bcc"] = smtp_config['username']
                     msg.attach(MIMEText(email_body, "html"))
 
                     try:
@@ -367,13 +406,15 @@ def run_from_ui(sheet_url, preview_only=False, email=None):
                         yield json.dumps({"type": "error", "message": f"Failed to send email to {email}: {str(e)}"})
                         # Try to reconnect if there's an error
                         try:
+                            print("Attempting to reconnect to SMTP server...")
                             server = smtplib.SMTP(smtp_config['server'], smtp_config['port'])
                             server.starttls()
                             server.login(smtp_config['username'], smtp_config['password'])
+                            print("Successfully reconnected to SMTP server")
                             yield json.dumps({"type": "status", "message": "✓ SMTP connection reestablished"})
                         except Exception as reconnect_error:
                             print(f"Failed to reconnect to SMTP server: {str(reconnect_error)}")
-                            yield json.dumps({"type": "error", "message": "Failed to reconnect to SMTP server. Stopping email sending."})
+                            yield json.dumps({"type": "error", "message": f"Failed to reconnect to SMTP server: {str(reconnect_error)}"})
                             break
                         continue
 
@@ -392,24 +433,30 @@ def run_from_ui(sheet_url, preview_only=False, email=None):
                     server.quit()
                     print("SMTP connection closed")
                     yield json.dumps({"type": "status", "message": "✓ SMTP connection closed"})
-                except:
-                    pass
+                except Exception as e:
+                    print(f"Error closing SMTP connection: {str(e)}")
 
         if not enriched_rows:
             yield json.dumps({"type": "error", "message": "No emails were sent successfully"})
             return
 
         # Save updated contact list to Downloads
-        final_df = pd.DataFrame(enriched_rows)
-        grouped_df = final_df.groupby("company").agg(lambda x: "\n".join(x.dropna().astype(str).unique())).reset_index()
-        ordered_cols = [
-            "company", "account_owner", "status", "industry", "HQ", "FTEs", "description",
-            "first_name", "last_name", "email", "role", "education", "location", "notes", "added", "last_contact"
-        ]
+        try:
+            print(f"Saving enriched contact list to: {UPDATED_LIST_PATH}")
+            final_df = pd.DataFrame(enriched_rows)
+            grouped_df = final_df.groupby("company").agg(lambda x: "\n".join(x.dropna().astype(str).unique())).reset_index()
+            ordered_cols = [
+                "company", "account_owner", "status", "industry", "HQ", "FTEs", "description",
+                "first_name", "last_name", "email", "role", "education", "location", "notes", "added", "last_contact"
+            ]
 
-        grouped_df[ordered_cols].to_excel(UPDATED_LIST_PATH, index=False, engine='openpyxl')
-        yield json.dumps({"type": "status", "message": f"→ Updated contact list saved to: {UPDATED_LIST_PATH}"})
-        yield json.dumps({"type": "status", "message": "✓ All emails sent successfully"})
+            grouped_df[ordered_cols].to_excel(UPDATED_LIST_PATH, index=False, engine='openpyxl')
+            print(f"Successfully saved enriched contact list to: {UPDATED_LIST_PATH}")
+            yield json.dumps({"type": "status", "message": f"→ Updated contact list saved to: {UPDATED_LIST_PATH}"})
+            yield json.dumps({"type": "status", "message": "✓ All emails sent successfully"})
+        except Exception as e:
+            print(f"Error saving enriched contact list: {str(e)}")
+            yield json.dumps({"type": "error", "message": f"Error saving enriched contact list: {str(e)}"})
 
     except Exception as e:
         print(f"Error in run_from_ui: {str(e)}")
