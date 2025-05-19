@@ -1,18 +1,18 @@
 import os
 import sys
+from dotenv import load_dotenv
+import pandas as pd
+import json
 import multiprocessing
 import subprocess
 from pathlib import Path
-from dotenv import load_dotenv
 from scripts.send_emails import run_from_ui
 from fastapi import FastAPI, Request, UploadFile, File, Form, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from db.config_db import save_user_config, get_user_config, get_user_templates, save_template, delete_template, update_template, init_default_template, get_db, UserConfig
 from fastapi.responses import StreamingResponse, JSONResponse, FileResponse
+from db.config_db import save_user_config, get_user_config, get_user_templates, save_template, delete_template, update_template, init_default_template, get_db, UserConfig
 import shutil
 from datetime import datetime
-import pandas as pd
-import json
 import requests
 from sqlalchemy.orm import Session
 from sqlalchemy import select
@@ -20,23 +20,31 @@ import logging
 import certifi
 import ssl
 
-# Configure logging
+############################################################################
+# CONFIGURATION
+############################################################################
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Get the project root directory
-PROJECT_ROOT = Path(__file__).parent.parent
-
-# Load environment variables in order of priority
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(PROJECT_ROOT / ".env.production")  # Load production first
 load_dotenv(PROJECT_ROOT / ".env.development")  # Then development
 load_dotenv(PROJECT_ROOT / ".env")  # Finally, any local overrides
 
-app = FastAPI()
-
-# Get infrastructure config from environment variables
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 PRODUCTION_URL = os.getenv("PRODUCTION_URL", "https://uiform-outreach-assistant.vercel.app")
+
+PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
+SCRIPTS_DIR = os.path.join(PROJECT_DIR, "scripts")
+
+download_script = os.path.join(SCRIPTS_DIR, "download_contacts.py")
+watch_script = os.path.join(SCRIPTS_DIR, "watch_folder.py")
+
+logs_folder = os.path.join(PROJECT_DIR, "logs")
+output_folder = os.path.join(PROJECT_DIR, "output")
+
+app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
@@ -46,6 +54,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+active_watcher = None
+
+############################################################################
+# FASTAPI ROUTES
+############################################################################
 
 @app.on_event("startup")
 async def startup_event():
@@ -58,7 +71,14 @@ async def post_config(request: Request):
     email = data.get("email")
     config = data.get("config")
     if not email or not config:
-        return {"error": "Missing email or config"}
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "message": "Missing email or config",
+                "code": "MISSING_PARAMS",
+                "action": "Please provide both email and config"
+            }
+        )
     save_user_config(email, config)
     return {"status": "ok"}
 
@@ -79,7 +99,14 @@ async def create_template(request: Request):
     email = data.get("email")
     template = data.get("template")
     if not email or not template:
-        return {"error": "Missing email or template"}
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "message": "Missing email or template",
+                "code": "MISSING_PARAMS",
+                "action": "Please provide both email and template"
+            }
+        )
     return save_template(email, template)
 
 
@@ -88,7 +115,14 @@ async def upload_template(
         email: str = Form(...),
         file: UploadFile = File(...)):
     if not file.filename.endswith('.txt'):
-        return {"error": "Only .txt files are allowed"}
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "message": "Invalid file type",
+                "code": "INVALID_FILE_TYPE",
+                "action": "Only .txt files are allowed"
+            }
+        )
 
     content = await file.read()
     try:
@@ -98,7 +132,14 @@ async def upload_template(
         }
         return save_template(email, template)
     except UnicodeDecodeError:
-        return {"error": "Invalid text file encoding. Please use UTF-8."}
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "message": "Invalid text file encoding",
+                "code": "INVALID_ENCODING",
+                "action": "Please use UTF-8 encoding"
+            }
+        )
 
 
 @app.delete("/templates/{template_name}")
@@ -113,21 +154,25 @@ async def update_template_endpoint(template_name: str, request: Request):
     email = data.get("email")
     updated_template = data.get("template")
     if not email or not updated_template:
-        return {"error": "Missing email or template"}
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "message": "Missing email or template",
+                "code": "MISSING_PARAMS",
+                "action": "Please provide both email and template"
+            }
+        )
     result = update_template(email, template_name, updated_template)
     if result:
         return result
-    return {"error": "Template not found or could not be updated"}
-
-PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
-SCRIPTS_DIR = os.path.join(PROJECT_DIR, "scripts")
-
-download_script = os.path.join(SCRIPTS_DIR, "download_contacts.py")
-watch_script = os.path.join(SCRIPTS_DIR, "watch_folder.py")
-
-logs_folder = os.path.join(PROJECT_DIR, "logs")
-output_folder = os.path.join(PROJECT_DIR, "output")
-
+    raise HTTPException(
+        status_code=404,
+        detail={
+            "message": "Template not found or could not be updated",
+            "code": "TEMPLATE_NOT_FOUND",
+            "action": "Please check the template name and try again"
+        }
+    )
 
 def run_script(script_path):
     """Run a script and return its output."""
@@ -145,7 +190,7 @@ def run_script_background(script_path, *args):
     os.system(" ".join(cmd))
 
 
-def start_watcher():
+def start_watcher_process():
     """Start the folder watcher process."""
     process = multiprocessing.Process(
         target=run_script_background, args=(
@@ -169,7 +214,7 @@ def download_contact_list():
 
 def send_outreach_emails():
     """Send outreach emails and return status updates."""
-    return send_emails.run_from_ui()
+    return run_from_ui()
 
 
 def get_folder_paths():
@@ -178,10 +223,6 @@ def get_folder_paths():
         "logs": logs_folder,
         "output": output_folder
     }
-
-
-active_watcher = None
-
 
 @app.post("/watcher/start")
 async def start_watcher(request: Request):

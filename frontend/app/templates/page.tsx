@@ -31,6 +31,11 @@ export default function TemplatesPage() {
   const [editingTemplate, setEditingTemplate] = useState<Template | null>(null);
 
   useEffect(() => {
+    const tid = setTimeout(() => setIsLoading(false), 3000);
+    return () => clearTimeout(tid);
+  }, []);
+
+  useEffect(() => {
     if (status === "unauthenticated") router.push("/");
     if (session?.user?.email) {
       fetchTemplates();
@@ -38,14 +43,15 @@ export default function TemplatesPage() {
   }, [status, router, session]);
 
   const fetchTemplates = async () => {
+    setIsLoading(true);
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/templates?email=${session?.user?.email}`);
-      if (response.ok) {
-        const data = await response.json();
-        setTemplates(data);
-      }
-    } catch (error) {
-      toast.error('Failed to load templates');
+      const url = `${process.env.NEXT_PUBLIC_BACKEND_URL}/templates?email=${session?.user?.email ?? ""}`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`API returned ${res.status}`);
+      setTemplates(await res.json());
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to load templates");
     } finally {
       setIsLoading(false);
     }
