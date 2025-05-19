@@ -188,7 +188,7 @@ export default function TemplatesPage() {
     });
   };
 
-  if (status === "loading" || isLoading) return <div>Loading...</div>;
+  if (status === "loading") return <div>Loading...</div>;
   if (!session) return null;
 
   return (
@@ -222,7 +222,28 @@ export default function TemplatesPage() {
           </div>
 
           {/* Default Template Explanation */}
-          {templates.find(t => t.is_default) && (
+          {isLoading ? (
+            <div className="animate-pulse">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 space-y-4">
+                <div className="flex items-start gap-3">
+                  <div className="bg-blue-100 p-2 rounded-full w-10 h-10"></div>
+                  <div className="flex-1">
+                    <div className="h-4 bg-blue-100 rounded w-1/3 mb-2"></div>
+                    <div className="h-3 bg-blue-100 rounded w-2/3 mb-4"></div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="h-3 bg-blue-100 rounded"></div>
+                      <div className="h-3 bg-blue-100 rounded"></div>
+                      <div className="h-3 bg-blue-100 rounded"></div>
+                      <div className="h-3 bg-blue-100 rounded"></div>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-white rounded-lg p-4 border border-blue-100">
+                  <div className="h-20 bg-blue-50 rounded"></div>
+                </div>
+              </div>
+            </div>
+          ) : templates.find(t => t.is_default) && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 space-y-4">
               <div className="flex items-start gap-3">
                 <div className="bg-blue-100 p-2 rounded-full">
@@ -279,90 +300,108 @@ export default function TemplatesPage() {
           )}
 
           <div className="space-y-2">
-            {templates.filter(t => !t.is_default).map((template) => (
-              <Collapsible
-                key={template.name}
-                open={openTemplates.has(template.name)}
-                onOpenChange={() => toggleTemplate(template.name)}
-                className="border rounded-lg"
-              >
-                <div className="flex items-center justify-between p-4">
-                  <CollapsibleTrigger className="flex items-center gap-2 hover:text-gray-600">
-                    <ChevronDown className={`h-4 w-4 transition-transform ${openTemplates.has(template.name) ? 'transform rotate-180' : ''}`} />
-                    <span className="font-medium">{template.name}</span>
-                  </CollapsibleTrigger>
-                  <div className="flex items-center gap-2">
-                    {editingTemplate?.name === template.name ? (
-                      <>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={handleSaveEdit}
-                          className="flex items-center gap-1"
-                        >
-                          <Save className="h-4 w-4" />
-                          Save
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={handleCancelEdit}
-                          className="flex items-center gap-1"
-                        >
-                          <X className="h-4 w-4" />
-                          Cancel
-                        </Button>
-                      </>
-                    ) : (
-                      <>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEdit(template)}
-                          className="flex items-center gap-1"
-                        >
-                          <Pencil className="h-4 w-4" />
-                          Edit
-                        </Button>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDelete(template.name);
-                          }}
-                        >
-                          × Delete
-                        </Button>
-                      </>
-                    )}
+            {isLoading ? (
+              // Loading skeleton for templates
+              Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="border rounded-lg p-4 animate-pulse">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 bg-gray-200 rounded"></div>
+                      <div className="h-4 bg-gray-200 rounded w-32"></div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="h-8 bg-gray-200 rounded w-16"></div>
+                      <div className="h-8 bg-gray-200 rounded w-16"></div>
+                    </div>
                   </div>
                 </div>
-                <CollapsibleContent className="px-4 pb-4">
-                  {editingTemplate?.name === template.name ? (
-                    <div className="space-y-4">
-                      <Input
-                        value={editingTemplate.name}
-                        onChange={(e) => setEditingTemplate(prev => ({ ...prev!, name: e.target.value }))}
-                        placeholder="Template Name"
-                      />
-                      <Textarea
-                        value={editingTemplate.content}
-                        onChange={(e) => setEditingTemplate(prev => ({ ...prev!, content: e.target.value }))}
-                        placeholder="Template Content"
-                        className="min-h-[200px]"
-                      />
+              ))
+            ) : (
+              templates.filter(t => !t.is_default).map((template) => (
+                <Collapsible
+                  key={template.name}
+                  open={openTemplates.has(template.name)}
+                  onOpenChange={() => toggleTemplate(template.name)}
+                  className="border rounded-lg"
+                >
+                  <div className="flex items-center justify-between p-4">
+                    <CollapsibleTrigger className="flex items-center gap-2 hover:text-gray-600">
+                      <ChevronDown className={`h-4 w-4 transition-transform ${openTemplates.has(template.name) ? 'transform rotate-180' : ''}`} />
+                      <span className="font-medium">{template.name}</span>
+                    </CollapsibleTrigger>
+                    <div className="flex items-center gap-2">
+                      {editingTemplate?.name === template.name ? (
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleSaveEdit}
+                            className="flex items-center gap-1"
+                          >
+                            <Save className="h-4 w-4" />
+                            Save
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleCancelEdit}
+                            className="flex items-center gap-1"
+                          >
+                            <X className="h-4 w-4" />
+                            Cancel
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEdit(template)}
+                            className="flex items-center gap-1"
+                          >
+                            <Pencil className="h-4 w-4" />
+                            Edit
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDelete(template.name);
+                            }}
+                          >
+                            × Delete
+                          </Button>
+                        </>
+                      )}
                     </div>
-                  ) : (
-                    <pre className="text-sm text-gray-600 whitespace-pre-wrap bg-gray-50 p-4 rounded-md">
-                      {template.content}
-                    </pre>
-                  )}
-                </CollapsibleContent>
-              </Collapsible>
-            ))}
+                  </div>
+                  <CollapsibleContent className="px-4 pb-4">
+                    {editingTemplate?.name === template.name ? (
+                      <div className="space-y-4">
+                        <Input
+                          value={editingTemplate.name}
+                          onChange={(e) => setEditingTemplate(prev => ({ ...prev!, name: e.target.value }))}
+                          placeholder="Template Name"
+                        />
+                        <Textarea
+                          value={editingTemplate.content}
+                          onChange={(e) => setEditingTemplate(prev => ({ ...prev!, content: e.target.value }))}
+                          placeholder="Template Content"
+                          className="min-h-[200px]"
+                        />
+                      </div>
+                    ) : (
+                      <pre className="text-sm text-gray-600 whitespace-pre-wrap bg-gray-50 p-4 rounded-md">
+                        {template.content}
+                      </pre>
+                    )}
+                  </CollapsibleContent>
+                </Collapsible>
+              ))
+            )}
 
-            {templates.filter(t => !t.is_default).length === 0 && (
+            {!isLoading && templates.filter(t => !t.is_default).length === 0 && (
               <div className="text-center text-gray-500 py-8 border rounded-lg">
                 No custom templates found. Create your first template to get started.
               </div>
