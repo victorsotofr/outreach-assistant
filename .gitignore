@@ -49,6 +49,15 @@ ENV/
 *.swp
 *.swo
 
+# macOS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
 # Project specific
 backend/db/.encryption_key
 backend/templates/
