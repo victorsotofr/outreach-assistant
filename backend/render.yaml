@@ -17,7 +17,7 @@ services:
         sync: false
       - key: SMTP_PORT
         sync: false
-      - key: UIFORM_API_KEY
+      - key: PROCESSING_API_KEY
         sync: false
-      - key: UIFORM_API_ENDPOINT
+      - key: PROCESSING_API_ENDPOINT
         sync: false 

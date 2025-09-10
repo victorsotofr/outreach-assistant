@@ -13,8 +13,8 @@ export default function Settings() {
   const { data: session, status } = useSession();
   const router = useRouter();
 
-  const [uiFormKey, setUiFormKey] = useState("");
-  const [uiFormEndpoint, setUiFormEndpoint] = useState("");
+  const [apiKey, setApiKey] = useState("");
+  const [apiEndpoint, setApiEndpoint] = useState("");
   const [openAiKey, setOpenAiKey] = useState("");
   const [emailUser, setEmailUser] = useState("");
   const [emailPass, setEmailPass] = useState("");
@@ -23,7 +23,7 @@ export default function Settings() {
   const [googleSheetUrl, setGoogleSheetUrl] = useState("");
 
   const [visibleFields, setVisibleFields] = useState<{ [key: string]: boolean }>({
-    uiform_api_key: false,
+    api_key: false,
     openai_api_key: false,
     smtp_pass: false
   });
@@ -48,8 +48,8 @@ export default function Settings() {
         if (!res.ok) throw new Error("Failed to fetch config");
         const data = await res.json();
         
-        setUiFormKey(data.uiform_api_key || "");
-        setUiFormEndpoint(data.uiform_api_endpoint || "");
+        setApiKey(data.api_key || "");
+        setApiEndpoint(data.api_endpoint || "");
         setOpenAiKey(data.openai_api_key || "");
         setEmailUser(data.smtp_user || "");
         setEmailPass(data.smtp_pass || "");
@@ -58,8 +58,8 @@ export default function Settings() {
         setGoogleSheetUrl(data.google_sheet_url || "");
 
         setSavedFields({
-          uiform_api_key: !!data.uiform_api_key,
-          uiform_api_endpoint: !!data.uiform_api_endpoint,
+          api_key: !!data.api_key,
+          api_endpoint: !!data.api_endpoint,
           openai_api_key: !!data.openai_api_key,
           smtp_user: !!data.smtp_user,
           smtp_pass: !!data.smtp_pass,
@@ -90,8 +90,8 @@ export default function Settings() {
           email: session.user.email,
           config: {
             openai_api_key: openAiKey,
-            uiform_api_key: uiFormKey,
-            uiform_api_endpoint: uiFormEndpoint,
+            api_key: apiKey,
+            api_endpoint: apiEndpoint,
             smtp_user: emailUser,
             smtp_pass: emailPass,
             smtp_server: smtpServer,
@@ -111,9 +111,9 @@ export default function Settings() {
       toast.success(`✓ ${section} saved.`);
       setSavedFields((prev) => ({
         ...prev,
-        ...(section === "UiForm API Key" && { 
-          uiform_api_key: true,
-          uiform_api_endpoint: true 
+        ...(section === "API Key" && { 
+          api_key: true,
+          api_endpoint: true 
         }),
         ...(section === "OpenAI API Key" && { openai_api_key: true }),
         ...(section === "Google Sheet URL" && { google_sheet_url: true }),
@@ -165,9 +165,7 @@ export default function Settings() {
   if (!session) return null;
 
   return (
-    <main className="flex flex-col h-screen">
-      <div className="flex-1 overflow-y-auto px-6 py-8 flex justify-center">
-        <div className="w-full max-w-4xl space-y-8">
+    <div className="w-full max-w-4xl mx-auto space-y-8">
           <div className="space-y-2">
             <h1 className="text-2xl font-semibold">Settings</h1>
             <p className="text-sm text-gray-600">
@@ -177,9 +175,8 @@ export default function Settings() {
 
           <section className="bg-white border border-gray-200 rounded-xl p-4 shadow space-y-2">
             <h2 className="text-lg font-semibold flex items-center gap-2">
-              <Image src="/uiform-logo.png" alt="UiForm" width={20} height={20} />
-              UiForm API Key
-              {savedFields["uiform_api_key"] && savedFields["uiform_api_endpoint"] && (
+              Processing API Key
+              {savedFields["api_key"] && savedFields["api_endpoint"] && (
                 <span className="text-green-500">✓</span>
               )}
             </h2>
@@ -187,16 +184,16 @@ export default function Settings() {
               <div className="space-y-2">
                 <div className="flex gap-2">
                   <Input
-                    id="uiform"
+                    id="api-key"
                     type="password"
-                    value={uiFormKey}
-                    onChange={(e) => setUiFormKey(e.target.value)}
-                    placeholder="sk_uiform-..."
+                    value={apiKey}
+                    onChange={(e) => setApiKey(e.target.value)}
+                    placeholder="sk-..."
                     className="flex-1"
                   />
                   <Button
-                    onClick={() => save("UiForm API Key")}
-                    disabled={!uiFormKey}
+                    onClick={() => save("API Key")}
+                    disabled={!apiKey}
                     variant="outline"
                   >
                     Save
@@ -204,16 +201,16 @@ export default function Settings() {
                 </div>
                 <div className="flex gap-2">
                   <Input
-                    id="uiform-endpoint"
+                    id="api-endpoint"
                     type="text"
-                    value={uiFormEndpoint}
-                    onChange={(e) => setUiFormEndpoint(e.target.value)}
-                    placeholder="https://api.uiform.io/v1"
+                    value={apiEndpoint}
+                    onChange={(e) => setApiEndpoint(e.target.value)}
+                    placeholder="https://api.example.com/v1"
                     className="flex-1"
                   />
                   <Button
-                    onClick={() => save("UiForm API Endpoint")}
-                    disabled={!uiFormEndpoint}
+                    onClick={() => save("API Endpoint")}
+                    disabled={!apiEndpoint}
                     variant="outline"
                   >
                     Save
@@ -393,8 +390,6 @@ export default function Settings() {
             <div className="space-y-4">
             </div>
           </section>
-        </div>
-      </div>
-    </main>
+    </div>
   );
 }

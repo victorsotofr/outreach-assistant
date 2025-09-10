@@ -16,7 +16,7 @@ async def process_image(
     db: Session = Depends(get_db)
 ):
     """
-    Process a single image file and extract data using UiForm API.
+    Process a single image file and extract data using processing API.
     The file is processed in memory without saving to disk.
     """
     if not file.filename.lower().endswith('.png'):
@@ -24,13 +24,13 @@ async def process_image(
 
     # Get user's API configuration
     config = db.query(UserConfig).filter(UserConfig.email == email).first()
-    if not config or not config.uiform_api_key or not config.uiform_api_endpoint:
+    if not config or not config.api_key or not config.api_endpoint:
         raise HTTPException(
             status_code=400,
             detail={
-                "message": "UiForm API configuration is missing",
+                "message": "Processing API configuration is missing",
                 "code": "MISSING_API_CONFIG",
-                "action": "Please configure your UiForm API settings first"
+                "action": "Please configure your processing API settings first"
             }
         )
 
@@ -46,7 +46,7 @@ async def process_image(
         # Decrypt the API endpoint
         from db.config_db import encryption
         try:
-            api_url = encryption.decrypt(config.uiform_api_endpoint)
+            api_url = encryption.decrypt(config.api_endpoint)
             if not api_url.startswith(('http://', 'https://')):
                 raise ValueError("Invalid API endpoint URL")
         except Exception as e:
@@ -73,11 +73,11 @@ async def process_image(
             'file': (file.filename, contents, 'image/png')
         }
         
-        # Process with UiForm API
+        # Process with processing API
         response = session.post(
             api_url,
             headers={
-                "Authorization": f"Bearer {config.uiform_api_key}"
+                "Authorization": f"Bearer {config.api_key}"
             },
             files=files,
             timeout=30  # Add timeout
@@ -86,7 +86,7 @@ async def process_image(
         logger.info(f"API Response status code: {response.status_code}")
         
         if response.status_code != 200:
-            error_detail = f"UiForm API error: Status {response.status_code}, Response: {response.text}"
+            error_detail = f"Processing API error: Status {response.status_code}, Response: {response.text}"
             logger.error(error_detail)
             raise HTTPException(
                 status_code=response.status_code,
@@ -113,7 +113,7 @@ async def process_image(
         raise HTTPException(
             status_code=500,
             detail={
-                "message": "Failed to connect to UiForm API",
+                "message": "Failed to connect to processing API",
                 "code": "CONNECTION_ERROR",
                 "error": str(e),
                 "action": "Please check your internet connection and try again"
@@ -125,7 +125,7 @@ async def process_image(
         raise HTTPException(
             status_code=500,
             detail={
-                "message": "Request to UiForm API timed out",
+                "message": "Request to processing API timed out",
                 "code": "TIMEOUT_ERROR",
                 "error": str(e),
                 "action": "Please try again later"

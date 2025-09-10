@@ -41,9 +41,9 @@ class UserConfig(Base):
     smtp_port = Column(Integer)
     smtp_server = Column(Text)
     smtp_user = Column(Text)
-    uiform_api_key = Column(Text)
+    api_key = Column(Text)
     watched_file_types = Column(ARRAY(Text))
-    uiform_api_endpoint = Column(Text)
+    api_endpoint = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -71,8 +71,8 @@ def get_db():
 
 SENSITIVE_FIELDS = {
     "openai_api_key",
-    "uiform_api_key",
-    "uiform_api_endpoint",
+    "api_key",
+    "api_endpoint",
     "smtp_pass",
 }
 
@@ -120,9 +120,9 @@ def init_db():
                     smtp_port INTEGER,
                     smtp_server TEXT,
                     smtp_user TEXT,
-                    uiform_api_key TEXT,
+                    api_key TEXT,
                     watched_file_types TEXT[],
-                    uiform_api_endpoint TEXT,
+                    api_endpoint TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
@@ -168,8 +168,8 @@ def decrypt_sensitive_fields(config: Dict[str, Any]) -> Dict[str, Any]:
     sensitive_fields = {
         'openai_api_key',
         'smtp_pass',
-        'uiform_api_key',
-        'uiform_api_endpoint'
+        'api_key',
+        'api_endpoint'
     }
     
     decrypted_config = config.copy()

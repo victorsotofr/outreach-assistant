@@ -139,7 +139,7 @@ def select_folder():
     home_dir = os.path.expanduser("~")
     
     # Create a default watch folder in the user's home directory
-    watch_folder = os.path.join(home_dir, "uiform_watch")
+    watch_folder = os.path.join(home_dir, "outreach_watch")
     
     # Create the folder if it doesn't exist
     os.makedirs(watch_folder, exist_ok=True)

@@ -43,11 +43,11 @@ def get_api_config(email):
     if not config:
         raise ValueError("No configuration found for user")
     
-    api_key = config.get("uiform_api_key")
-    api_endpoint = config.get("uiform_api_endpoint")
+    api_key = config.get("api_key")
+    api_endpoint = config.get("api_endpoint")
     
     if not api_key or not api_endpoint:
-        raise ValueError("Missing UiForm API configuration")
+        raise ValueError("Missing API configuration")
     
     return api_key, api_endpoint
 

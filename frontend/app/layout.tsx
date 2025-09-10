@@ -15,9 +15,9 @@ const geistMono = Roboto_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "UiForm – Outreach Assistant",
+  title: "Outreach Assistant",
   description:
-    "Take Your Outreach Further with UiForm",
+    "Scale Your Outreach with Smart Automation",
 };
 
 export default function RootLayout({

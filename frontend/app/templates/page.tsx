@@ -192,11 +192,9 @@ export default function TemplatesPage() {
   if (!session) return null;
 
   return (
-    <main className="flex flex-col h-screen">
-      <div className="flex-1 overflow-y-auto px-6 py-8 flex justify-center">
-        <div className="w-full max-w-4xl space-y-8">
-          <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-semibold">⌟ Templates</h1>
+    <div className="w-full max-w-4xl mx-auto space-y-8">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">Templates</h1>
             <div className="flex items-center gap-4">
               <input
                 type="file"
@@ -413,8 +411,6 @@ export default function TemplatesPage() {
             <div className="space-y-4">
             </div>
           </section>
-        </div>
-      </div>
-    </main>
+    </div>
   );
 }

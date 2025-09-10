@@ -9,7 +9,7 @@ load_dotenv(PROJECT_ROOT / ".env")  # Finally, any local overrides
 
 # Frontend URLs
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
-PRODUCTION_URL = os.getenv("PRODUCTION_URL", "https://uiform-outreach-assistant.vercel.app")
+PRODUCTION_URL = os.getenv("PRODUCTION_URL", "https://outreach-assistant.vercel.app")
 
 # Project directories
 PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

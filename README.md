@@ -1,8 +1,8 @@
 # Outreach Assistant
 
-Visit it [**HERE**](https://outreach-assistant.vercel.app/).
+> **VISIT** [**HERE**](https://outreach-assistant.vercel.app/)
 
-The starting point: I needed to scale my outreach capacity in a smart way at [Retab](https://www.retab.com/) (a product previously branded [UiForm](https://www.uiform.com/) and developed by [CubeAI](https://www.getcube.ai/en)).
+The starting point: I needed to scale my outreach capacity in a smart way at [Retab](https://www.retab.com/).
 
 Goal was to use my Google email adresses, but also student email adresses (via SMTP), and create a seamless flow adapted to my outreach strategy & habits.
 

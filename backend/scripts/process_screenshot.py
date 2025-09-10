@@ -52,16 +52,16 @@ def get_api_config(email):
     if not config:
         raise ValueError("No configuration found for user")
     
-    api_key = config.get("uiform_api_key")
-    api_endpoint = config.get("uiform_api_endpoint")
+    api_key = config.get("api_key")
+    api_endpoint = config.get("api_endpoint")
     
     if not api_key or not api_endpoint:
-        raise ValueError("Missing UiForm API configuration")
+        raise ValueError("Missing API configuration")
     
     return api_key, api_endpoint
 
 def process_file(file_path, email):
-    """Process a file by uploading it to UiForm API."""
+    """Process a file by uploading it to processing API."""
     if not os.path.exists(file_path):
         print(f"Error: File not found: {file_path}")
         return False
@@ -91,7 +91,7 @@ def process_file(file_path, email):
             files = {"file": (filename, file_content, "image/png")}
             headers = {"Api-Key": api_key}
             
-            print(f"Uploading to UiForm API...")
+            print(f"Uploading to processing API...")
             response = requests.post(api_endpoint, headers=headers, files=files, timeout=30)
 
         if response.status_code == 200:

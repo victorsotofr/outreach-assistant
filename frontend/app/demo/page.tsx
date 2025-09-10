@@ -15,39 +15,33 @@ export default function DashboardPage() {
   }, [status, router]);
 
   if (status === "loading") return (
-    <main className="flex flex-col h-screen">
-      <div className="flex-1 overflow-y-auto px-6 py-8 flex justify-center">
-        <div className="w-full max-w-4xl space-y-6">
-          <div className="h-8 w-32 bg-gray-200 rounded animate-pulse"></div>
+    <div className="w-full max-w-4xl mx-auto space-y-6">
+      <div className="h-8 w-32 bg-gray-200 rounded animate-pulse"></div>
+      
+      <div className="border rounded-lg p-6">
+        <div className="space-y-4">
+          <div className="h-6 w-48 bg-gray-200 rounded animate-pulse"></div>
+          <div className="h-4 w-3/4 bg-gray-200 rounded animate-pulse"></div>
           
-          <div className="border rounded-lg p-6">
-            <div className="space-y-4">
-              <div className="h-6 w-48 bg-gray-200 rounded animate-pulse"></div>
-              <div className="h-4 w-3/4 bg-gray-200 rounded animate-pulse"></div>
-              
-              <div className="aspect-video w-full bg-gray-100 rounded-lg animate-pulse"></div>
+          <div className="aspect-video w-full bg-gray-100 rounded-lg animate-pulse"></div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-                {Array.from({ length: 3 }).map((_, i) => (
-                  <div key={i} className="p-4 bg-gray-50 rounded-lg space-y-2">
-                    <div className="h-5 w-32 bg-gray-200 rounded animate-pulse"></div>
-                    <div className="h-4 w-full bg-gray-200 rounded animate-pulse"></div>
-                  </div>
-                ))}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="p-4 bg-gray-50 rounded-lg space-y-2">
+                <div className="h-5 w-32 bg-gray-200 rounded animate-pulse"></div>
+                <div className="h-4 w-full bg-gray-200 rounded animate-pulse"></div>
               </div>
-            </div>
+            ))}
           </div>
         </div>
       </div>
-    </main>
+    </div>
   );
   if (!session) return null;
 
   return (
-    <main className="flex flex-col h-screen">
-      <div className="flex-1 overflow-y-auto px-6 py-8 flex justify-center">
-        <div className="w-full max-w-4xl space-y-6">
-          <h1 className="text-2xl font-semibold">⌟ Demo</h1>
+    <div className="w-full max-w-4xl mx-auto space-y-6">
+      <h1 className="text-2xl font-semibold">Demo</h1>
           
           <Card>
             <CardContent className="p-6">
@@ -61,7 +55,6 @@ export default function DashboardPage() {
                   <video 
                     className="w-full h-full rounded-lg shadow-lg"
                     controls
-                    poster="/uiform-logo.png"
                   >
                     <source src="/outreach-demo.mp4" type="video/mp4" />
                     Your browser does not support the video tag.
@@ -71,7 +64,7 @@ export default function DashboardPage() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
                   <div className="p-4 bg-gray-50 rounded-lg">
                     <h3 className="font-semibold mb-2">1. Import Contacts</h3>
-                    <p className="text-sm text-gray-600">Connect UiForm and your Google Sheet to import your contact list in seconds.</p>
+                    <p className="text-sm text-gray-600">Connect your data processing API and Google Sheet to import your contact list in seconds.</p>
                   </div>
                   <div className="p-4 bg-gray-50 rounded-lg">
                     <h3 className="font-semibold mb-2">2. AI Enrichment</h3>
@@ -85,8 +78,6 @@ export default function DashboardPage() {
               </div>
             </CardContent>
           </Card>
-        </div>
-      </div>
-    </main>
+    </div>
   );
 }

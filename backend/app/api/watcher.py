@@ -44,13 +44,13 @@ async def start_watcher(request: Request):
     # Verify user configuration before starting
     try:
         config = get_user_config(email)
-        if not config.get("uiform_api_key") or not config.get("uiform_api_endpoint"):
+        if not config.get("api_key") or not config.get("api_endpoint"):
             raise HTTPException(
                 status_code=400,
                 detail={
-                    "message": "UiForm API configuration is missing",
+                    "message": "Processing API configuration is missing",
                     "code": "MISSING_API_CONFIG",
-                    "action": "Please configure your UiForm API settings first"
+                    "action": "Please configure your processing API settings first"
                 }
             )
     except Exception as e:
