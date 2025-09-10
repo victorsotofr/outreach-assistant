@@ -2,8 +2,8 @@ import os
 import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .core.settings import FRONTEND_URL, PRODUCTION_URL
-from .api import config, templates, watcher, sheets
+# Other settings imports can be added here as needed
+from .api import config, templates, watcher, sheets, images
 from db.config_db import init_default_template
 
 # Configure logging
@@ -12,10 +12,15 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
-# Configure CORS
+# Configure CORS for NextAuth compatibility
+origins = [
+    "http://localhost:3000",
+    "https://outreach-assistant.vercel.app",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[FRONTEND_URL, PRODUCTION_URL],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -26,11 +31,12 @@ app.add_middleware(
 async def startup_event():
     init_default_template()
 
-# Include routers
-app.include_router(config.router, prefix="/api", tags=["config"])
-app.include_router(templates.router, prefix="/api", tags=["templates"])
-app.include_router(watcher.router, prefix="/api", tags=["watcher"])
-app.include_router(sheets.router, prefix="/api", tags=["sheets"])
+# Include routers (no prefix to maintain compatibility with frontend)
+app.include_router(config.router, tags=["config"])
+app.include_router(templates.router, tags=["templates"])
+app.include_router(watcher.router, tags=["watcher"])
+app.include_router(sheets.router, tags=["sheets"])
+app.include_router(images.router, tags=["images"])
 
 @app.get("/")
 async def root():

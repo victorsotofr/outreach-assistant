@@ -14,6 +14,9 @@ export const authOptions: NextAuthOptions = {
     signIn: "/",
   },
   callbacks: {
+    async redirect({ url, baseUrl }) {
+      return `${baseUrl}/dashboard`;
+    },
     async session({ session, token }) {
       if (session.user && token.email) {
         session.user.email = token.email as string;

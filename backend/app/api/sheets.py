@@ -126,4 +126,38 @@ async def send_emails(request: Request):
                 "code": "EMAIL_ERROR",
                 "action": "Please try again or contact support"
             }
-        ) 
+        )
+
+@router.post("/select-folder")
+def select_folder():
+    """
+    Returns a default folder path for the user's system.
+    In production, this will be a fixed path that the user can configure.
+    """
+    import os
+    # Get the user's home directory
+    home_dir = os.path.expanduser("~")
+    
+    # Create a default watch folder in the user's home directory
+    watch_folder = os.path.join(home_dir, "uiform_watch")
+    
+    # Create the folder if it doesn't exist
+    os.makedirs(watch_folder, exist_ok=True)
+    
+    return {"folder": watch_folder}
+
+@router.get("/download-file")
+async def download_file(path: str):
+    """Serve a file for download."""
+    import os
+    try:
+        if not os.path.exists(path):
+            raise HTTPException(status_code=404, detail="File not found")
+        
+        return FileResponse(
+            path,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            filename="contact_list.xlsx"
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) 

@@ -25,8 +25,8 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
       className={cn(
         "block px-3 py-2 rounded text-sm font-medium transition",
         pathname === href
-          ? "bg-gray-100 text-gray-1500 font-bold"
-          : "hover:bg-gray-50 text-gray-1000"
+          ? "bg-gray-100 text-gray-900 font-bold"
+          : "hover:bg-gray-50 text-gray-700"
       )}
     >
       {label}

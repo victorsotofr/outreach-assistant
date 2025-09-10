@@ -1,16 +1,12 @@
-# UiForm Outreach Assistant
+# Outreach Assistant
 
-Visit it [**HERE**](https://uiform-outreach-assistant.vercel.app/).
+Visit it [**HERE**](https://outreach-assistant.vercel.app/).
 
-The starting point was the following: as a Growth Engineer working to scale our great product at [UiForm](https://www.uiform.com/), I wanted to reach out to **A LOT** of people. For this purpose, there are nice fee-paying existing Chrome extensions, but that poorly integrated in the sales outbound flow I had.
+The starting point: I needed to scale my outreach capacity in a smart way at [Retab](https://www.retab.com/) (a product previously branded [UiForm](https://www.uiform.com/) and developed by [CubeAI](https://www.getcube.ai/en)).
 
-Problem — Analysis — Solution. 
-My idea was to use our product and the extensions to create a frictionless flow and scale our sales outbound. 
+Goal was to use my Google email adresses, but also student email adresses (via SMTP), and create a seamless flow adapted to my outreach strategy & habits.
 
-I did a cool stuff, it worked. After tens of sales meetings booked thanks to it, I share it to you.
-
-It's simple, especially thanks to [UiForm](https://www.uiform.com/) — go check it out, the product is brillant.
-
+Victor
 
 -- 
 
